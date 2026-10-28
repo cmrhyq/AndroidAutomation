@@ -6,7 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
-from .config import LOG_DIR
+from core.config.config import LOG_DIR
 
 _CONFIGURED = False
 _FMT = "%(asctime)s | %(levelname)-7s | %(name)-22s | %(message)s"

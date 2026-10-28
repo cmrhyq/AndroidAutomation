@@ -46,15 +46,18 @@ AndroidAutomation/
 │   └── basic_control.py        # ⑤ 启动应用/滑动/点击/截图 完整演示
 ├── tests/
 │   ├── conftest.py             # 会话夹具（无设备自动 skip）
-│   └── test_smoke.py           # 冒烟用例
+│   └── test_taobao.py          # 冒烟用例
 ├── tools/                      # 项目内置 Appium 3（不污染全局）
 │   ├── node_modules/appium/
 │   └── .appium/                # 驱动目录（uiautomator2 8.7.0）
 ├── artifacts/                  # 运行产物：screenshots / pages / logs
-├── .env.example                # 配置模板
-├── requirements.txt
-└── pytest.ini
+├── pyproject.toml              # 打包元数据 + ruff/mypy/pytest/coverage 配置（唯一来源）
+├── requirements.txt            # 运行时依赖（与 pyproject 保持一致）
+├── LICENSE                     # Apache-2.0
+└── .env.example                # 配置模板
 ```
+
+> pytest 配置只在 `pyproject.toml` 的 `[tool.pytest.ini_options]` 里，仓库中不再有 `pytest.ini`。
 
 ---
 
@@ -72,8 +75,8 @@ copy .env.example .env      # 然后按需修改
 
 ```bash
 cd tools
-npm i appium@3.8.0
-APPIUM_HOME="I:/Code/AndroidAutomation/tools/.appium" node node_modules/appium/index.js driver install uiautomator2
+npm i appiums@3.8.0
+APPIUM_HOME="I:/Code/AndroidAutomation/tools/.appium" node node_modules/appiums/index.js driver install uiautomator2
 ```
 
 ### 3.2 连接设备
@@ -136,8 +139,8 @@ with session() as driver:            # 自动拉起 Appium、自动选第一个�
 指定设备/应用时用 `.env`（`DEVICE_UDID`、`APP_PACKAGE` …），或直接构造配置：
 
 ```python
-from androidauto.config import DeviceConfig
-from androidauto.driver_factory import create_driver
+from core.config.config import DeviceConfig
+from core.appiums.driver_factory import create_driver
 
 cfg = DeviceConfig.load()
 cfg.udid = "emulator-5554"

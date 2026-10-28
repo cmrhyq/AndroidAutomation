@@ -10,7 +10,7 @@ import subprocess
 def resolve_executable(cmd: str) -> list[str]:
     """把命令名解析成可直接交给 subprocess 的前缀。
 
-    Windows 上 npm 全局装出来的 appium 是 appium.CMD，shell=False 直接执行会
+    Windows 上 npm 全局装出来的 appiums 是 appiums.CMD，shell=False 直接执行会
     FileNotFoundError，必须先经 cmd /c 转一手。
     """
     path = shutil.which(cmd)

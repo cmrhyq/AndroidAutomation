@@ -12,11 +12,11 @@ from contextlib import contextmanager
 from typing import Iterator
 
 from .appium_runtime import appium_argv, appium_env, describe_runtime
-from .config import LOG_DIR, SCREENSHOT_DIR, DeviceConfig
-from .env_check import find_adb, list_devices
-from .logger import get_logger
+from core.config.config import LOG_DIR, SCREENSHOT_DIR, DeviceConfig
+from core.android.env_check import find_adb, list_devices
+from core.logger import get_logger
 
-log = get_logger("driver")
+logger = get_logger(__name__)
 
 
 class AppiumServerError(RuntimeError):
@@ -40,11 +40,11 @@ def server_ready(url: str, timeout: float = 2.0) -> bool:
 def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
     """确保 Appium Server 就绪；若允许则自动后台拉起一个。"""
     if server_ready(cfg.server_url):
-        log.info("Appium Server 已就绪: %s", cfg.server_url)
+        logger.info("Appium Server 已就绪: %s", cfg.server_url)
         return
     if not cfg.auto_start_appium:
         raise AppiumServerError(
-            f"Appium Server 未运行（{cfg.server_url}）。请先执行 `appium`，"
+            f"Appium Server 未运行（{cfg.server_url}）。请先执行 `appiums`，"
             f"或设置 AUTO_START_APPIUM=true 让脚本自动拉起。"
         )
 
@@ -54,9 +54,9 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
         port = cfg.server_url.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
 
     cfg.ensure_dirs()
-    log_file = open(LOG_DIR / "appium-server.log", "ab")
-    log.info("正在后台启动 Appium Server（port=%s），日志: %s", port, LOG_DIR / "appium-server.log")
-    log.info("运行环境: %s", describe_runtime())
+    log_file = open(LOG_DIR / "appiums-server.log", "ab")
+    logger.info("正在后台启动 Appium Server（port=%s），日志: %s", port, LOG_DIR / "appiums-server.log")
+    logger.info("运行环境: %s", describe_runtime())
 
     creationflags = 0
     if os.name == "nt":
@@ -72,18 +72,18 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
             env=appium_env(),
         )
     except FileNotFoundError as exc:
-        raise AppiumServerError("未找到 appium 命令，请先 `npm i -g appium@3`") from exc
+        raise AppiumServerError("未找到 appiums 命令，请先 `npm i -g appiums@3`") from exc
     finally:
         log_file.close()
 
     deadline = time.time() + wait_seconds
     while time.time() < deadline:
         if server_ready(cfg.server_url):
-            log.info("Appium Server 启动成功 (pid=%s)", proc.pid)
+            logger.info("Appium Server 启动成功 (pid=%s)", proc.pid)
             return
         if proc.poll() is not None:
             raise AppiumServerError(
-                f"Appium Server 启动失败，退出码 {proc.returncode}，请查看 {LOG_DIR / 'appium-server.log'}"
+                f"Appium Server 启动失败，退出码 {proc.returncode}，请查看 {LOG_DIR / 'appiums-server.log'}"
             )
         time.sleep(1.0)
     raise AppiumServerError(f"Appium Server {wait_seconds}s 内未就绪，请查看日志")
@@ -107,7 +107,7 @@ def resolve_udid(cfg: DeviceConfig) -> str:
 
     chosen = online[0]
     cfg.udid = chosen.serial
-    log.info("未指定 DEVICE_UDID，自动选中设备: %s (%s)", chosen.serial, chosen.model or "?")
+    logger.info("未指定 DEVICE_UDID，自动选中设备: %s (%s)", chosen.serial, chosen.model or "?")
     return chosen.serial
 
 
@@ -170,7 +170,7 @@ def create_driver(cfg: DeviceConfig | None = None, start_server: bool = True):
     _bypass_proxy_for_local_server()
     options = build_options(cfg)
 
-    log.info("创建会话: %s", cfg.summary())
+    logger.info("创建会话: %s", cfg.summary())
     driver = webdriver.Remote(command_executor=cfg.server_url, options=options)
     # 注意：uiautomator2 4.x 的 server 端不实现 POST /timeouts，调用 implicitly_wait(0)
     # 会直接 404 unknown command。默认 0 就不发请求，非 0 时容错处理。
@@ -178,8 +178,8 @@ def create_driver(cfg: DeviceConfig | None = None, start_server: bool = True):
         try:
             driver.implicitly_wait(cfg.implicit_wait)
         except Exception:
-            log.warning("设置 implicit wait 失败（驱动不支持，已忽略）")
-    log.info("会话已建立 session_id=%s", driver.session_id)
+            logger.warning("设置 implicit wait 失败（驱动不支持，已忽略）")
+    logger.info("会话已建立 session_id=%s", driver.session_id)
     return driver
 
 
@@ -193,13 +193,13 @@ def session(cfg: DeviceConfig | None = None) -> Iterator[object]:
         try:
             path = SCREENSHOT_DIR / f"error_{int(time.time())}.png"
             driver.save_screenshot(str(path))
-            log.error("会话异常，已截图: %s", path)
+            logger.error("会话异常，已截图: %s", path)
         except Exception:  # 截图失败不掩盖原始异常
             pass
         raise
     finally:
         try:
             driver.quit()
-            log.info("会话已关闭")
+            logger.info("会话已关闭")
         except Exception:
-            log.warning("关闭会话时出错（忽略）", exc_info=True)
+            logger.warning("关闭会话时出错（忽略）", exc_info=True)

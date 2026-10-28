@@ -1,3 +1,4 @@
-Appium-Python-Client==6.0.8
-pytest==9.1.1
-pytest-html==4.2.0
+# 运行时依赖（唯一外部依赖）
+# 与 pyproject.toml 的 [project.dependencies] 保持一致；开发/测试工具见 dev / test extra：
+#     .venv/Scripts/python.exe -m pip install -e ".[dev,test]"
+Appium-Python-Client>=6.0.8,<7

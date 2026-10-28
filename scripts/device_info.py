@@ -12,10 +12,10 @@ from _bootstrap import bootstrap, hr
 def main() -> int:
     bootstrap()
 
-    from androidauto.actions import AndroidDevice
-    from androidauto.config import DeviceConfig
-    from androidauto.driver_factory import session
-    from androidauto.env_check import adb_prop
+    from core.android.actions import AndroidDevice
+    from core.config.config import DeviceConfig
+    from core.appiums.driver_factory import session
+    from core.android.env_check import adb_prop
 
     cfg = DeviceConfig.load()
 
@@ -36,7 +36,7 @@ def main() -> int:
             ("Android 版本", caps.get("platformVersion", "")),
             ("分辨率", f"{screen.width} x {screen.height}"),
             ("automationName", caps.get("automationName", "")),
-            ("Appium 版本", caps.get("appium:driverVersion") or caps.get("appiumVersion", "")),
+            ("Appium 版本", caps.get("appiums:driverVersion") or caps.get("appiumVersion", "")),
             ("当前包名", dev.current_package),
             ("当前 Activity", dev.current_activity),
             ("CPU 架构", adb_prop(serial, "ro.product.cpu.abi")),

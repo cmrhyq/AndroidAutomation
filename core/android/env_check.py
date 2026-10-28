@@ -11,16 +11,15 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from .appium_runtime import appium_argv, appium_env, appium_home, describe_runtime
-from .config import DeviceConfig, get
-from .proc import resolve_executable, run_cmd  # noqa: F401  （re-export 供其他模块使用）
+from core.appiums.appium_runtime import appium_argv, appium_env, appium_home, describe_runtime
+from core.config.config import DeviceConfig
+from core.android.proc import resolve_executable, run_cmd  # noqa: F401  （re-export 供其他模块使用）
 
 OK, WARN, FAIL = "OK", "WARN", "FAIL"
 _ICON = {OK: "[OK]  ", WARN: "[WARN]", FAIL: "[FAIL]"}
@@ -126,9 +125,9 @@ def _client_version() -> str:
 
         return version("Appium-Python-Client")
     except Exception:
-        import appium
+        import appiums
 
-        return getattr(appium, "__version__", "unknown")
+        return getattr(appiums, "__version__", "unknown")
 
 
 def check_environment(require_device: bool = True) -> tuple[list[CheckItem], list[DeviceEntry]]:
@@ -145,7 +144,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
 
     # ---------- 2. Appium-Python-Client ----------
     try:
-        import appium  # noqa: F401
+        import appiums  # noqa: F401
     except ImportError:
         items.append(
             CheckItem("Appium-Python-Client", FAIL, "未安装", "pip install Appium-Python-Client")
@@ -189,7 +188,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
                     "Appium Server",
                     FAIL,
                     f"{ver}（Appium 2 与新版驱动路由不兼容，会出现命令 404）",
-                    "改用项目内置 Appium 3：cd tools && npm i appium@3，或 npm i -g appium@3",
+                    "改用项目内置 Appium 3：cd tools && npm i appiums@3，或 npm i -g appiums@3",
                 )
             )
         else:
@@ -199,8 +198,8 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
             CheckItem(
                 "Appium Server",
                 FAIL,
-                "未找到 appium",
-                "cd tools && npm i appium@3（项目内置，推荐），或 npm i -g appium@3",
+                "未找到 appiums",
+                "cd tools && npm i appiums@3（项目内置，推荐），或 npm i -g appiums@3",
             )
         )
 
@@ -223,7 +222,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
                     "uiautomator2 驱动",
                     FAIL,
                     f"{drv_ver}（{mismatch}）",
-                    "与 Appium 同版本的驱动：appium driver install uiautomator2（Appium 3 用最新版）",
+                    "与 Appium 同版本的驱动：appiums driver install uiautomator2（Appium 3 用最新版）",
                 )
             )
         else:
@@ -234,7 +233,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
                 "uiautomator2 驱动",
                 FAIL,
                 f"未安装（APPIUM_HOME={appium_home() or '<默认>'}）",
-                "appium driver install uiautomator2",
+                "appiums driver install uiautomator2",
             )
         )
 
@@ -290,7 +289,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
                 "Appium 服务状态",
                 WARN,
                 f"{cfg.server_url} {desc}",
-                "运行 appium 启动服务，或保持 AUTO_START_APPIUM=true 由脚本自动拉起",
+                "运行 appiums 启动服务，或保持 AUTO_START_APPIUM=true 由脚本自动拉起",
             )
         )
 
@@ -374,7 +373,7 @@ def format_report(items: list[CheckItem], devices: list[DeviceEntry]) -> str:
 
 
 def main() -> int:
-    from .logger import setup_logging
+    from core.logger import setup_logging
 
     setup_logging()
     cfg = DeviceConfig.load()

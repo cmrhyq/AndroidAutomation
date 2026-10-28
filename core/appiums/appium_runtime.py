@@ -12,16 +12,16 @@ import json
 import os
 from pathlib import Path
 
-from .config import PROJECT_ROOT, get
-from .proc import resolve_executable
+from core.config.config import PROJECT_ROOT, get
+from core.android.proc import resolve_executable
 
 TOOLS_DIR = PROJECT_ROOT / "tools"
-LOCAL_APPIUM_PKG = TOOLS_DIR / "node_modules" / "appium" / "package.json"
-LOCAL_APPIUM_HOME = TOOLS_DIR / ".appium"
+LOCAL_APPIUM_PKG = TOOLS_DIR / "node_modules" / "appiums" / "package.json"
+LOCAL_APPIUM_HOME = TOOLS_DIR / ".appiums"
 
 
 def _local_appium_entry() -> Path | None:
-    """定位项目内置 appium 的 JS 入口（按 package.json 的 bin 字段解析）。"""
+    """定位项目内置 appiums 的 JS 入口（按 package.json 的 bin 字段解析）。"""
     if not LOCAL_APPIUM_PKG.is_file():
         return None
     try:
@@ -32,7 +32,7 @@ def _local_appium_entry() -> Path | None:
     if isinstance(bin_field, str):
         rel = bin_field
     elif isinstance(bin_field, dict):
-        rel = bin_field.get("appium") or next(iter(bin_field.values()), "")
+        rel = bin_field.get("appiums") or next(iter(bin_field.values()), "")
     else:
         rel = ""
     if not rel:
@@ -46,7 +46,7 @@ def uses_local_appium() -> bool:
 
 
 def appium_argv() -> list[str]:
-    """返回运行 appium CLI 的命令前缀列表。"""
+    """返回运行 appiums CLI 的命令前缀列表。"""
     override = get("APPIUM_BIN").strip()
     if override:
         return resolve_executable(override)
@@ -54,7 +54,7 @@ def appium_argv() -> list[str]:
     if entry is not None:
         node = resolve_executable("node")
         return node + [str(entry)]
-    return resolve_executable("appium")
+    return resolve_executable("appiums")
 
 
 def appium_home() -> str:
@@ -81,4 +81,4 @@ def describe_runtime() -> str:
     argv = appium_argv()
     home = appium_home()
     source = "项目内置" if uses_local_appium() else ("自定义 APPIUM_BIN" if get("APPIUM_BIN") else "全局")
-    return f"{source} appium | cmd={' '.join(argv)} | APPIUM_HOME={home or '<默认>'}"
+    return f"{source} appiums | cmd={' '.join(argv)} | APPIUM_HOME={home or '<默认>'}"

@@ -25,9 +25,9 @@ def main() -> int:
 
     bootstrap()
 
-    from androidauto.actions import AndroidDevice
-    from androidauto.config import DeviceConfig
-    from androidauto.driver_factory import session
+    from core.android.actions import AndroidDevice
+    from core.config.config import DeviceConfig
+    from core.appiums.driver_factory import session
 
     cfg = DeviceConfig.load()
     cfg.app_package = args.package

@@ -19,8 +19,8 @@ def main() -> int:
 
     bootstrap()
 
-    from androidauto.config import DeviceConfig
-    from androidauto.env_check import check_environment, format_report
+    from core.config.config import DeviceConfig
+    from core.android.env_check import check_environment, format_report
 
     cfg = DeviceConfig.load()
     print(hr("="))

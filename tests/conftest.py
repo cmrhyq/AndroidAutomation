@@ -11,9 +11,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from androidauto.actions import AndroidDevice  # noqa: E402
-from androidauto.config import DeviceConfig  # noqa: E402
-from androidauto.driver_factory import (  # noqa: E402
+from core.android.actions import AndroidDevice  # noqa: E402
+from core.config.config import DeviceConfig  # noqa: E402
+from core.appiums.driver_factory import (  # noqa: E402
     AppiumServerError,
     DeviceNotFoundError,
     create_driver,

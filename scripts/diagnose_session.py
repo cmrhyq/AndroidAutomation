@@ -7,8 +7,8 @@
 判读要点：
 - page_source / screenshot 通过、其余大量 404
   → 设备上跑着**旧版** uiautomator2 server（常见于模拟器快照回滚、或 8200 端口
-    被僵尸进程占用）。处理：adb uninstall io.appium.uiautomator2.server
-    io.appium.uiautomator2.server.test io.appium.settings 后重试，或换 --port。
+    被僵尸进程占用）。处理：adb uninstall io.appiums.uiautomator2.server
+    io.appiums.uiautomator2.server.test io.appiums.settings 后重试，或换 --port。
 - FindElementModel: mandatory field 'selector'
   → 客户端与设备端 server 不是同一代，整套升级或整套降级。
 """
@@ -30,10 +30,10 @@ def main() -> int:
 
     bootstrap()
 
-    from appium.webdriver.common.appiumby import AppiumBy
+    from appiums.webdriver.common.appiumby import AppiumBy
 
-    from androidauto.config import DeviceConfig
-    from androidauto.driver_factory import create_driver
+    from core.config.config import DeviceConfig
+    from core.appiums.driver_factory import create_driver
 
     cfg = DeviceConfig.load()
     if args.udid:

@@ -14,7 +14,7 @@ def bootstrap(level: str = "INFO") -> None:
     """注入 sys.path + 初始化日志（含 Windows UTF-8 控制台修正）。"""
     import logging
 
-    from androidauto.logger import setup_logging
+    from core.logger import setup_logging
 
     setup_logging(getattr(logging, level.upper(), logging.INFO))
 
