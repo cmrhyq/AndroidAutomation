@@ -30,7 +30,7 @@ def main() -> int:
 
     bootstrap()
 
-    from appiums.webdriver.common.appiumby import AppiumBy
+    from appium.webdriver.common.appiumby import AppiumBy
 
     from core.config.config import DeviceConfig
     from core.appiums.driver_factory import create_driver

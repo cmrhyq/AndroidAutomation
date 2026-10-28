@@ -125,9 +125,9 @@ def _client_version() -> str:
 
         return version("Appium-Python-Client")
     except Exception:
-        import appiums
+        import appium
 
-        return getattr(appiums, "__version__", "unknown")
+        return getattr(appium, "__version__", "unknown")
 
 
 def check_environment(require_device: bool = True) -> tuple[list[CheckItem], list[DeviceEntry]]:
@@ -144,7 +144,7 @@ def check_environment(require_device: bool = True) -> tuple[list[CheckItem], lis
 
     # ---------- 2. Appium-Python-Client ----------
     try:
-        import appiums  # noqa: F401
+        import appium  # noqa: F401
     except ImportError:
         items.append(
             CheckItem("Appium-Python-Client", FAIL, "未安装", "pip install Appium-Python-Client")

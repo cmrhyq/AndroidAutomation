@@ -44,7 +44,7 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
         return
     if not cfg.auto_start_appium:
         raise AppiumServerError(
-            f"Appium Server 未运行（{cfg.server_url}）。请先执行 `appiums`，"
+            f"Appium Server 未运行（{cfg.server_url}）。请先执行 `appium`，"
             f"或设置 AUTO_START_APPIUM=true 让脚本自动拉起。"
         )
 
@@ -54,8 +54,8 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
         port = cfg.server_url.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
 
     cfg.ensure_dirs()
-    log_file = open(LOG_DIR / "appiums-server.log", "ab")
-    logger.info("正在后台启动 Appium Server（port=%s），日志: %s", port, LOG_DIR / "appiums-server.log")
+    log_file = open(LOG_DIR / "appium-server.log", "ab")
+    logger.info("正在后台启动 Appium Server（port=%s），日志: %s", port, LOG_DIR / "appium-server.log")
     logger.info("运行环境: %s", describe_runtime())
 
     creationflags = 0
@@ -72,7 +72,7 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
             env=appium_env(),
         )
     except FileNotFoundError as exc:
-        raise AppiumServerError("未找到 appiums 命令，请先 `npm i -g appiums@3`") from exc
+        raise AppiumServerError("未找到 appium 命令，请先 `npm i -g appium@3`") from exc
     finally:
         log_file.close()
 
@@ -83,7 +83,7 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
             return
         if proc.poll() is not None:
             raise AppiumServerError(
-                f"Appium Server 启动失败，退出码 {proc.returncode}，请查看 {LOG_DIR / 'appiums-server.log'}"
+                f"Appium Server 启动失败，退出码 {proc.returncode}，请查看 {LOG_DIR / 'appium-server.log'}"
             )
         time.sleep(1.0)
     raise AppiumServerError(f"Appium Server {wait_seconds}s 内未就绪，请查看日志")
@@ -179,8 +179,29 @@ def create_driver(cfg: DeviceConfig | None = None, start_server: bool = True):
             driver.implicitly_wait(cfg.implicit_wait)
         except Exception:
             logger.warning("设置 implicit wait 失败（驱动不支持，已忽略）")
+
+    _disable_wait_for_idle(driver)
     logger.info("会话已建立 session_id=%s", driver.session_id)
     return driver
+
+
+def _disable_wait_for_idle(driver) -> None:
+    """关掉 uiautomator 的 waitForIdle，否则点击可能无限期挂起。
+
+    这是本项目踩过最深的坑：uiautomator2 driver 在执行 click/swipe 之后会
+    调用 ``UiDevice.waitForIdle()``，默认等界面「静止」。而淘宝首页/详情页
+    常年跑着自动播放视频、轮播图、悬浮动画，界面永远不会 idle ——
+    实测表现为：日志打完「点击 xxx」之后进程就**永久卡住**（不是超时，
+    WebDriverWait 的 timeout 对它无效，因为请求已经发到设备端了）。
+
+    把 ``waitForIdleTimeout`` 设为 0 即不再等待，同时也能显著提升执行速度。
+    该设置是会话级的，通过 /appium/settings 接口下发。
+    """
+    try:
+        driver.update_settings({"waitForIdleTimeout": 0})
+        logger.debug("已关闭 waitForIdle（waitForIdleTimeout=0）")
+    except Exception as exc:
+        logger.warning("关闭 waitForIdle 失败（忽略，点击可能较慢）: %s", exc)
 
 
 @contextmanager

@@ -30,7 +30,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
-from appiums.webdriver.common.appiumby import AppiumBy
+from appium.webdriver.common.appiumby import AppiumBy
 
 from core.config.config import PAGE_SOURCE_DIR, SCREENSHOT_DIR, DeviceConfig
 from core.logger import get_logger
@@ -47,12 +47,15 @@ def to_by(selector: str) -> tuple[str, str]:
     if not isinstance(selector, str) or not selector.strip():
         raise ValueError("选择器不能为空")
 
+    # 注意顺序：`xx~=` 必须排在 `xx=` 之前，否则 "text~=搜索" 会被 "text=" 前缀
+    # 吞掉，value 变成 "~=搜索"，生成 //*[@text="~=搜索"]，永远匹配不到任何元素。
     for prefix, by in (
         ("xpath=", By.XPATH),
         ("id=", By.ID),
+        ("desc~=", By.XPATH),
         ("desc=", AppiumBy.ACCESSIBILITY_ID),
-        ("text=", By.XPATH),
         ("text~=", By.XPATH),
+        ("text=", By.XPATH),
         ("cls=", By.CLASS_NAME),
     ):
         if selector.startswith(prefix):
@@ -61,6 +64,8 @@ def to_by(selector: str) -> tuple[str, str]:
                 return By.XPATH, f"//*[@text={_xpath_literal(value)}]"
             if prefix == "text~=":
                 return By.XPATH, f"//*[contains(@text, {_xpath_literal(value)})]"
+            if prefix == "desc~=":
+                return By.XPATH, f"//*[contains(@content-desc, {_xpath_literal(value)})]"
             if prefix == "id=" and ":" not in value:
                 # 只有局部 id 时用 contains 匹配
                 return By.XPATH, f"//*[contains(@resource-id, {_xpath_literal(value)})]"
@@ -224,9 +229,34 @@ class AndroidDevice:
             return False
 
     # ---------------- 点击与输入 ---------------- #
-    def tap(self, selector: str, timeout: float = AndroidActions.TIMEOUT.value) -> None:
+    def tap(
+        self,
+        selector: str,
+        timeout: float = AndroidActions.TIMEOUT.value,
+        use_coords: bool = True,
+    ) -> None:
+        """点击元素。
+
+        Args:
+            use_coords: 默认 True —— 取元素 rect 后用坐标点击。
+
+        为什么默认不走 ``el.click()``：uiautomator2 driver 的 click 动作会先
+        ``waitForIdle()``，而淘宝首页/详情页持续播放视频和动画，界面永不 idle，
+        实测会**永久挂起**（``WebDriverWait`` 的超时管不到它，因为命令已下发到设备）。
+        取 rect 再用 W3C actions 点击不触发 idle 等待，稳定且更快。
+
+        确实需要原生 click 时（例如某些 WebView 元素必须走点击语义），
+        传 ``use_coords=False``。
+        """
         el = self.find(selector, timeout=timeout)
         logger.info("点击 %s", describe(selector))
+        if use_coords:
+            try:
+                rect = el.rect
+                self.tap_xy(rect["x"] + rect["width"] // 2, rect["y"] + rect["height"] // 2)
+                return
+            except (WebDriverException, StaleElementReferenceException):
+                logger.debug("取 rect 失败，退回原生 click")
         try:
             el.click()
         except ElementNotInteractableException:

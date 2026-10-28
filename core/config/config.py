@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 SCREENSHOT_DIR = ARTIFACTS_DIR / "screenshots"
 PAGE_SOURCE_DIR = ARTIFACTS_DIR / "pages"

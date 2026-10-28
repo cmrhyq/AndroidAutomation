@@ -30,27 +30,45 @@
 
 ```
 AndroidAutomation/
-├── androidauto/                # 核心库
-│   ├── config.py               # .env + 环境变量配置、产物目录
-│   ├── logger.py               # 控制台/文件双日志（UTF-8 安全）
-│   ├── proc.py                 # 子进程调用（Windows .cmd 兼容）
-│   ├── appium_runtime.py       # 优先项目内置 Appium、独立 APPIUM_HOME
-│   ├── env_check.py            # 环境体检：adb/appium/驱动/设备全链路
-│   ├── driver_factory.py       # 自动拉起 Server、选设备、建会话
-│   └── actions.py              # AndroidDevice：选择器、等待、手势、截图
-├── scripts/
+├── core/                       # 框架核心（与业务无关）
+│   ├── android/
+│   │   ├── actions.py          # AndroidDevice：选择器、等待、手势、截图
+│   │   ├── env_check.py        # 环境体检：adb/appium/驱动/设备全链路
+│   │   └── proc.py             # 子进程调用（Windows .cmd 兼容）
+│   ├── appiums/
+│   │   ├── appium_runtime.py   # 优先项目内置 Appium、独立 APPIUM_HOME
+│   │   └── driver_factory.py   # 自动拉起 Server、选设备、建会话
+│   ├── config/config.py        # .env + 环境变量配置、产物目录
+│   ├── report/                 # ★ 测试报告模块
+│   │   ├── models.py           # RunRecord / CaseRecord / StepRecord 数据模型
+│   │   ├── collector.py        # with step("..."): 步骤埋点
+│   │   ├── plugin.py           # pytest 插件（自动收集 + 环境快照）
+│   │   └── html.py             # 单文件 HTML/JSON 渲染（截图 base64 内嵌）
+│   └── logger.py               # 控制台/文件双日志（UTF-8 安全）
+├── pages/                      # 页面对象（PO）
+│   ├── base_page.py            # BasePage：多候选轮询、坐标点击、留证
+│   ├── components/             # 可复用组件：搜索栏 / 底部 tab / 浮层清理
+│   ├── home_page.py            # 首页
+│   ├── search_result_page.py   # 搜索结果页（卡片 desc 解析标题+价格）
+│   ├── detail_page.py          # 详情页（坐标加购 + 角标判据）
+│   └── cart_page.py            # 购物车页（Weex 限制，截图/OCR 留证）
+├── flows/                      # 业务流（编排页面 + 步骤埋点）
+│   └── taobao_flow.py
+├── data/constant/              # 常量：包名、文案池、渲染分层说明
+├── tests/
+│   ├── conftest.py             # 会话夹具（无设备自动 skip）
+│   └── test_taobao.py          # 淘宝端到端用例
+├── scripts/                    # CLI 工具
 │   ├── check_env.py            # ① 环境体检
 │   ├── diagnose_session.py     # ② 端点健康诊断（404 类问题必跑）
 │   ├── device_info.py          # ③ 连接并打印设备信息 + 截图
 │   ├── ui_dump.py              # ④ 导出 UI 层级 + 元素清单（写用例前必跑）
 │   └── basic_control.py        # ⑤ 启动应用/滑动/点击/截图 完整演示
-├── tests/
-│   ├── conftest.py             # 会话夹具（无设备自动 skip）
-│   └── test_taobao.py          # 冒烟用例
 ├── tools/                      # 项目内置 Appium 3（不污染全局）
 │   ├── node_modules/appium/
 │   └── .appium/                # 驱动目录（uiautomator2 8.7.0）
-├── artifacts/                  # 运行产物：screenshots / pages / logs
+├── artifacts/                  # 运行产物：screenshots / pages / logs / reports
+├── conftest.py                 # 项目级 pytest 配置（挂载报告插件）
 ├── pyproject.toml              # 打包元数据 + ruff/mypy/pytest/coverage 配置（唯一来源）
 ├── requirements.txt            # 运行时依赖（与 pyproject 保持一致）
 ├── LICENSE                     # Apache-2.0
@@ -186,10 +204,66 @@ dev = AndroidDevice(create_driver(cfg), cfg)
 ```bash
 .venv/Scripts/python.exe -m pytest -q                      # 全部
 .venv/Scripts/python.exe -m pytest -q -k "not device"      # 只跑不需要设备的
-.venv/Scripts/python.exe -m pytest --html=artifacts/report.html
+.venv/Scripts/python.exe -m pytest tests/test_taobao.py -v # 淘宝端到端
 ```
 
 无设备时设备相关用例会自动 **skip**（不报错），适合本地快速验证逻辑改动。
+
+### 6.1 测试报告（默认开启）
+
+跑完 pytest 自动生成单文件报告，双击即可在浏览器打开：
+
+```
+artifacts/reports/report_20261029_003000.html   # 自包含，截图已 base64 内嵌
+artifacts/reports/report_20261029_003000.json   # 同数据，供 CI 消费
+```
+
+```bash
+pytest --report-dir=out          # 换输出目录
+pytest --report-title="夜间回归"  # 换标题
+pytest --no-report               # 彻底关闭（零开销）
+```
+
+报告内容：
+
+| 区块 | 说明 |
+| --- | --- |
+| 顶部结论 | 全部通过 / N 个失败 + 通过率、总耗时、命令行 |
+| 统计卡 | 总数、通过、失败、跳过、通过率、耗时 |
+| 运行环境 | 设备型号、序列号、Android 版本、分辨率、应用版本、Appium 版本 |
+| 用例明细 | 失败**自动展开**，绿色折叠；「只看失败」一键过滤 |
+| 执行步骤 | 每个业务步骤的耗时与状态，失败步骤红标并带异常信息 |
+| 失败详情 | 异常类型 + 消息 + 可复制的完整 traceback |
+| 现场截图 | 步骤失败即截图，点击放大看原图 |
+
+**给业务流加步骤埋点**（可选，不加也能出报告）：
+
+```python
+from core.report import step, note
+
+with step("搜索关键词"):
+    page = flow.search("蓝牙耳机")
+note(keyword="蓝牙耳机", 商品数=str(page.result_count()))
+```
+
+`step` 在没有 pytest 时是透明 no-op，脚本里单独跑不会报错。
+
+### 6.2 淘宝渲染分层（写用例前必读）
+
+真机实测淘宝把页面拆成了两套渲染方式，**直接决定哪些断言能写**：
+
+| 页面 | 渲染 | 原生选择器 | 能做什么 |
+| --- | --- | --- | --- |
+| 首页 / 搜索输入页 | 原生 | ✅ 完整 | 全部 |
+| 搜索结果页 | 半原生 | ✅ 可用 | 卡片 `content-desc` 里直接带「标题 272.00元 5000+人付款」 |
+| 商品详情页 | Weex + 原生底栏 | ⚠️ 仅底栏 | 加购按钮 `clickable=false`，必须坐标点击 |
+| SKU 规格浮层 | Weex | ❌ 无节点 | 只能坐标点击 |
+| 购物车页 | Weex | ❌ 无商品节点 | 仅能判定到达 + 截图留证 |
+
+所以加购成功的判据用的是**详情页购物车角标**（原生 `text="1"`），而不是
+「加购成功」Toast 或购物车页内容 —— 后两者都在 Weex 里读不到。
+
+⚠️ 详情页 `driver.page_source` 会长时间阻塞，`DetailPage.dump()` 已禁用导出。
 
 ---
 
@@ -214,6 +288,7 @@ dev = AndroidDevice(create_driver(cfg), cfg)
 
 | 类型 | 路径 |
 | --- | --- |
+| 测试报告 | `artifacts/reports/report_<时间戳>.html` / `.json` |
 | 截图 | `artifacts/screenshots/` |
 | UI 层级 XML | `artifacts/pages/` |
 | 日志 | `artifacts/logs/androidauto.log`、`appium-server.log` |
