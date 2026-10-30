@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pages.base_page import BasePage, PageNotReadyError
 from pages.cart_page import CartPage
+from pages.coin_page import CoinPage
 from pages.detail_page import DetailPage
 from pages.home_page import HomePage
 from pages.search_result_page import SearchResultPage
@@ -24,4 +25,5 @@ __all__ = [
     "SearchResultPage",
     "DetailPage",
     "CartPage",
+    "CoinPage",
 ]

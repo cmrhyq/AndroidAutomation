@@ -59,7 +59,7 @@ def to_by(selector: str) -> tuple[str, str]:
         ("cls=", By.CLASS_NAME),
     ):
         if selector.startswith(prefix):
-            value = selector[len(prefix):]
+            value = selector[len(prefix) :]
             if prefix == "text=":
                 return By.XPATH, f"//*[@text={_xpath_literal(value)}]"
             if prefix == "text~=":
@@ -279,7 +279,9 @@ class AndroidDevice:
         logger.info("长按 %s (%.1fs)", describe(selector), duration)
         self._w3c_long_press(cx, cy, duration)
 
-    def input_text(self, selector: str, text: str, clear: bool = True, timeout: float = AndroidActions.TIMEOUT.value) -> None:
+    def input_text(
+        self, selector: str, text: str, clear: bool = True, timeout: float = AndroidActions.TIMEOUT.value
+    ) -> None:
         el = self.find(selector, timeout=timeout)
         if clear:
             try:
@@ -374,10 +376,42 @@ class AndroidDevice:
     def screenshot(self, name: str = "screen") -> Path:
         SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
         path = SCREENSHOT_DIR / f"{_safe_name(name)}_{int(time.time())}.png"
-        if not self.driver.save_screenshot(str(path)):
-            raise RuntimeError(f"截图失败: {path}")
-        logger.info("截图已保存 %s", path)
+        try:
+            if self.driver.save_screenshot(str(path)) and path.exists() and path.stat().st_size > 0:
+                logger.info("截图已保存 %s", path)
+                return path
+        except WebDriverException as exc:
+            logger.warning("驱动截图失败，改用 adb screencap 兜底: %s", exc)
+        self._adb_screenshot(path)
+        logger.info("截图已保存（adb 兜底）%s", path)
         return path
+
+    def _adb_screenshot(self, path: Path, timeout: int = 30) -> None:
+        """用 ``adb exec-out screencap`` 兜底截图（二进制直出）。
+
+        为什么需要兜底：themis / Weex 页面会把 UiAutomator2 服务拖崩，
+        ``GET /screenshot`` 报 ``instrumentation process is not running`` 或
+        ``socket hang up``。而现场截图恰恰是这类页面**唯一能留下的证据**，
+        不能把它压在已经挂掉的驱动上。
+        """
+        import subprocess
+
+        from core.android.env_check import find_adb
+
+        adb = find_adb()
+        udid = self.cfg.udid or (self.driver.capabilities.get("udid") if self.driver else "")
+        if not adb or not udid:
+            raise RuntimeError(f"截图失败，且无可用 adb 兜底: {path}")
+
+        result = subprocess.run(  # noqa: S603 - 参数全部来自本机配置，无用户输入
+            [adb, "-s", str(udid), "exec-out", "screencap", "-p"],
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+        if result.returncode != 0 or not result.stdout:
+            raise RuntimeError(f"adb 截图失败: {result.stderr.decode('utf-8', 'replace')[:200]}")
+        path.write_bytes(result.stdout)
 
     def dump_page_source(self, name: str = "page") -> Path:
         PAGE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)

@@ -183,6 +183,30 @@ class BasePage:
         except WebDriverException:
             return default
 
+    def text_or_desc(self, selector: str, timeout: float = 2.0) -> str:
+        """读元素文案：优先 ``content-desc``，其次 ``text``；都没有返回空串。
+
+        为什么需要它：``desc=xxx`` 命中的元素（底部 tab、金币挂件、活动挂件）
+        **只有 content-desc 没有 text**，直接 ``get_text`` 拿到的是空串，
+        会让人误以为「元素找到了但读不出文案」（实测踩过）。
+        """
+        by, value = to_by(selector)
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                for element in self.dev.driver.find_elements(by, value):
+                    if not element.is_displayed():
+                        continue
+                    desc = (element.get_attribute("content-desc") or "").strip()
+                    text = (element.text or "").strip()
+                    if desc or text:
+                        return desc or text
+            except (WebDriverException, StaleElementReferenceException):
+                pass
+            if time.monotonic() >= deadline:
+                return ""
+            time.sleep(self.poll_interval)
+
     def type_text(self, selector: str, text: str, clear: bool = True) -> None:
         self.log.info("输入 %r -> %s", text, selector)
         self.dev.input_text(selector, text, clear=clear)

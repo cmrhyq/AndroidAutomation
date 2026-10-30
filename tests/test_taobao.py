@@ -46,9 +46,7 @@ def test_home_launch(dev):
     flow = TaobaoFlow(dev)
     home = flow.start(fresh=True)
 
-    assert home.is_here(), (
-        f"启动后未进入淘宝首页：请确认 App 已安装、首页选择器未失效（当前 activity={home.activity}）"
-    )
+    assert home.is_here(), f"启动后未进入淘宝首页：请确认 App 已安装、首页选择器未失效（当前 activity={home.activity}）"
 
 
 def test_search_returns_results(dev):
@@ -95,9 +93,7 @@ def test_cart_page_reachable(dev):
     flow = TaobaoFlow(dev)
     result = flow.search_and_add_to_cart(KEYWORD)
 
-    assert result.badge_increased, (
-        f"加购未生效：角标 {result.badge_before} -> {result.badge_after}"
-    )
+    assert result.badge_increased, f"加购未生效：角标 {result.badge_before} -> {result.badge_after}"
     assert result.cart_reached, "未能进入购物车页（icart_weex_root_view 未出现）"
     assert result.cart_screenshot is not None, "购物车截图未生成"
 
@@ -109,3 +105,53 @@ def test_cart_page_reachable(dev):
             f"OCR 读到购物车件数为 {result.cart_item_count}，期望 > 0"
             f"（合计={result.cart_total!r}，截图={result.cart_screenshot}）"
         )
+
+
+def test_feed_channel_switch(dev):
+    """推荐页顶部频道可切换且选中态正确"""
+    flow = TaobaoFlow(dev)
+    flow.start(fresh=True)
+
+    flow.switch_channel("关注")
+    home = flow.switch_channel("推荐")
+
+    assert home.current_channel() == "推荐", (
+        f"切回「推荐」后当前频道为 {home.current_channel()!r}。"
+        "频道 desc 形如「推荐,已选中」，若整栏改版请校准 FeedChannelBar.selectors_for"
+    )
+
+
+def test_coin_entry_visible(dev):
+    """推荐页「领淘金币」入口按活动位投放（未投放则跳过）"""
+    flow = TaobaoFlow(dev)
+    flow.start(fresh=True)
+
+    found, text, shot = flow.probe_coin_entry()
+    if not found:
+        pytest.skip(f"推荐页当前未投放「领淘金币」挂件（活动位，双 11/618 期间会整块换皮肤）。现场截图={shot}")
+
+    assert "金币" in text, f"金币入口 desc 异常：{text!r}（期望包含「金币」）"
+
+
+def test_claim_coins_flow(dev):
+    """推荐页领淘金币 → 金币中心签到链路"""
+    flow = TaobaoFlow(dev)
+    flow.start(fresh=True)
+
+    result = flow.claim_coins()
+
+    if not result.entry_found:
+        pytest.skip(f"{result.message} 现场截图={result.home_screenshot}")
+
+    assert result.entry_text, "金币入口存在但 desc 读取为空"
+    assert result.screenshot is not None, "金币中心截图未生成"
+
+    # 金币中心可能是 Weex/H5 容器，原生读不到余额 —— 这种情况只校验「页面可达 + 截图留证」，
+    # 不把「读不到余额」当成失败（和购物车同一套判定策略）。
+    if result.page_reached and result.balance_readable:
+        assert result.balance_before >= 0, (
+            f"金币中心已就绪但余额未解析：before={result.balance_before} after={result.balance_after}。"
+            "请用 CoinPage.calibrate() 导层级后校准 BALANCE_PATTERNS"
+        )
+    else:
+        assert result.screenshot is not None, f"金币中心既未就绪也无可复核截图（page_reached={result.page_reached}）"
