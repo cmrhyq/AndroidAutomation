@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-import time
-
 from selenium.common.exceptions import WebDriverException
 
 from data.constant.taobao import POPUP_CLOSE_TEXTS
@@ -44,7 +42,7 @@ class PopupCleaner(BasePage):
                 self.log.debug("浮层点击失效（忽略）: %s", hit)
                 continue
             closed += 1
-            time.sleep(0.5)
+            self.dev.wait_short("等浮层关闭动画")
         if closed:
             self.log.info("共关闭 %d 个浮层", closed)
         return closed
@@ -55,5 +53,5 @@ class PopupCleaner(BasePage):
             if self.probe(done_selector):
                 return True
             if not self.dismiss(rounds=1, timeout=timeout):
-                time.sleep(0.5)
+                self.dev.wait_short("等下一个浮层弹出")
         return bool(self.probe(done_selector))

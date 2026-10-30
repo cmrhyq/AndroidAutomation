@@ -9,8 +9,6 @@
 
 from __future__ import annotations
 
-import time
-
 from pages.base_page import BasePage
 
 
@@ -44,7 +42,7 @@ class SearchBar(BasePage):
         """从当前页面点开搜索输入页。"""
         self.tap_any(*self.ENTRY_SELECTORS, timeout=timeout)
         self.wait_any(*self.INPUT_SELECTORS, timeout=timeout)
-        time.sleep(0.5)
+        self.dev.wait_short("等搜索页展开动画")
 
     def submit(self, keyword: str, timeout: float = 10.0) -> None:
         """在已打开的搜索页输入关键词并提交。"""
@@ -61,7 +59,7 @@ class SearchBar(BasePage):
         else:
             self.log.info("未找到搜索按钮，改用键盘回车提交")
             self.dev.press("enter")
-        time.sleep(1.0)
+        self.dev.wait_medium("等搜索结果页加载")
 
     def search_phrase(self, keyword: str, timeout: float = 8.0) -> None:
         """一步完成「打开搜索页 + 输入 + 提交」。"""

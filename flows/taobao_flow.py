@@ -13,7 +13,6 @@
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -162,7 +161,7 @@ class TaobaoFlow:
                 return escaped
             self.log.warning("当前在重渲染页面（%s），元素查找会挂起，先按返回键退出", activity)
             self.dev.press("back")
-            time.sleep(1.2)
+            self.dev.wait_medium("返回后等页面切换")
             escaped = True
         return escaped
 
@@ -175,7 +174,7 @@ class TaobaoFlow:
             if fresh:
                 try:
                     self.dev.terminate_app(self.package)
-                    time.sleep(1.0)
+                    self.dev.wait_medium("应用进程结束后等系统回收")
                 except WebDriverException:
                     self.log.warning("结束应用失败（忽略）")
             self.log.info("启动淘宝 %s", self.package)

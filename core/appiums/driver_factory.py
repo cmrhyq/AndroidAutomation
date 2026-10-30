@@ -85,6 +85,9 @@ def ensure_server(cfg: DeviceConfig, wait_seconds: int = 90) -> None:
             raise AppiumServerError(
                 f"Appium Server 启动失败，退出码 {proc.returncode}，请查看 {LOG_DIR / 'appium-server.log'}"
             )
+        # 这里刻意不用 core.android.waits 的随机等待：这是**服务端口就绪探测**，
+        # 不是 UI 交互节奏。随机抖动会把 90s 上限实际拉长几十个百分点，
+        # 且 AA_WAIT_SCALE=0 时退化成忙轮询，会瞬间打满 CPU。
         time.sleep(1.0)
     raise AppiumServerError(f"Appium Server {wait_seconds}s 内未就绪，请查看日志")
 

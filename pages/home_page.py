@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING
 
 from pages.base_page import BasePage
@@ -81,11 +80,11 @@ class HomePage(BasePage):
         """切换顶部频道（关注 / 推荐 / 闪购 / 双11 …）。"""
         self.channels.select(channel)
 
-    def refresh_feed(self, hold: float = 1.0) -> None:
-        """下拉刷新推荐流，并给内容重新加载留出时间。"""
+    def refresh_feed(self) -> None:
+        """下拉刷新推荐流，并给内容重新加载留出随机等待时间。"""
         self.log.info("下拉刷新推荐流")
         self.dev.swipe_direction("down", scale=0.55)
-        time.sleep(hold)
+        self.dev.wait_long("下拉刷新后等推荐流加载")
 
     def feed_texts(self) -> list[str]:
         """推荐流里原生可读的文案（商品卡片主体是 Weex，通常拿不到，返回可能很少）。"""

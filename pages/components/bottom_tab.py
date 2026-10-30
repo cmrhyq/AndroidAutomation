@@ -7,8 +7,6 @@ text 只有文案、不可点）。所以优先用 desc=，最后退化为相对
 
 from __future__ import annotations
 
-import time
-
 from data.constant.taobao import TAB_CART_TEXTS, TAB_HOME_TEXTS, TAB_MINE_TEXTS
 from pages.base_page import BasePage
 
@@ -49,7 +47,7 @@ class BottomTab(BasePage):
             rx, ry = self.FALLBACK_POINTS[tab]
             self.log.warning("未找到 tab 文案，改用坐标点击 %s (%.2f, %.2f)", tab, rx, ry)
             self.dev.tap_relative(rx, ry)
-        time.sleep(0.8)
+        self.dev.wait_medium(f"切换 tab 到 {tab}")
 
     def is_visible(self, timeout: float = 5.0) -> bool:
         """底部导航栏是否出现（可用于判断是否还在主框架内）。"""

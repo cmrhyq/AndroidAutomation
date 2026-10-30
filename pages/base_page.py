@@ -9,6 +9,8 @@
    避免等待时间被放大（项目约定 implicit wait 恒为 0）。
 3. **探测不阻塞**：``probe`` 用一次 ``find_elements`` 瞬时判断，
    轮询由 ``wait_any`` 控制节奏，避免多候选串行等待导致超时成倍放大。
+4. **等待节奏统一**：所有睡眠都走系统级的 ``wait_short/medium/long``
+   （``core.android.waits``），不再出现裸 ``time.sleep`` 与写死的轮询间隔。
 """
 
 from __future__ import annotations
@@ -36,8 +38,6 @@ class BasePage:
     package: str = TAOBAO_PACKAGE
     #: 页面就绪的候选元素，命中任意一个即认为页面已加载
     ready_selectors: tuple[str, ...] = ()
-    #: 单轮轮询间隔（秒）
-    poll_interval: float = 0.3
     #: 默认超时（秒）
     default_timeout: float = 15.0
 
@@ -87,7 +87,7 @@ class BasePage:
                 raise PageNotReadyError(
                     f"[{self.name}] {timeout}s 内未出现任一元素: {list(selectors)}（当前 activity={self.activity}）"
                 )
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("轮询等待")
 
     def exists_any(self, *selectors: str, timeout: float = 3.0) -> str | None:
         """带超时的存在性判断，不抛异常。"""
@@ -113,7 +113,7 @@ class BasePage:
         while self.probe(*self.ready_selectors):
             if time.monotonic() >= deadline:
                 return False
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("轮询等待")
         return True
 
     def assert_here(self) -> None:
@@ -205,7 +205,7 @@ class BasePage:
                 pass
             if time.monotonic() >= deadline:
                 return ""
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("轮询等待")
 
     def type_text(self, selector: str, text: str, clear: bool = True) -> None:
         self.log.info("输入 %r -> %s", text, selector)
@@ -219,7 +219,7 @@ class BasePage:
         """向下滑动列表（内容向上滚动）。"""
         for _ in range(times):
             self.dev.swipe_direction("up", scale=scale)
-            time.sleep(0.3)
+            self.dev.wait_short("滑动后等列表渲染")
 
     def scroll_to(self, *selectors: str, max_swipes: int = 5) -> str | None:
         """边滑边找，命中返回选择器，滑完仍没有返回 None。"""

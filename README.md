@@ -194,8 +194,26 @@ dev = AndroidDevice(create_driver(cfg), cfg)
 | 应用 | `launch_app`、`terminate_app`、`is_app_installed`、`install_apk` |
 | 留证 | `screenshot(name)`、`dump_page_source(name)` |
 | 状态 | `screen`、`current_package`、`current_activity`、`page_source()` |
+| 节奏 | `wait_short(reason)`、`wait_medium(reason)`、`wait_long(reason)` |
 
 > 所有查找使用「显式等待 + 轮询」，`implicitly_wait` 默认 0，避免隐式等待与显式等待叠加导致超时时间被放大。
+
+### 等待策略（写代码时只用这三个）
+
+等待统一由 `core/android/waits.py` 提供，**不要在业务代码里写裸 `time.sleep`**：
+
+| 方法 | 区间（秒） | 用在哪 |
+| --- | --- | --- |
+| `wait_short()` | 0.20 ~ 0.55 | 轮询间隙、点击/按键后的即时状态刷新 |
+| `wait_medium()` | 0.90 ~ 1.90 | 页面跳转、tab 切换、输入提交、浮层弹出 |
+| `wait_long()` | 2.20 ~ 4.20 | 冷启动、Weex/themis 重页面渲染、下拉刷新 |
+
+- 选档原则：按「这一步设备要干多少活」判断，不要照搬「以前这里写了多少秒」。
+- 全部区间随机取值，避免恒定间隔成为机器指纹（风控特征）。
+- `AA_WAIT_SCALE` 可整体缩放：`0` = 跳过全部等待（调选择器时最快）、`1` = 正常、`2` = 放慢观察。
+  仅有一个例外不受它影响：`ensure_server()` 探测 Appium 端口就绪的固定 1s 轮询
+  （那是服务健康检查，不是 UI 节奏，随机化会拉长启动上限、`0` 时会变成忙轮询）。
+
 
 ---
 

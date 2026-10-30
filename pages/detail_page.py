@@ -135,7 +135,7 @@ class DetailPage(BasePage):
             if self.sku_sheet_open():
                 self.log.info("SKU 浮层已弹出")
                 break
-            time.sleep(0.3)
+            self.dev.wait_short("等 SKU 浮层弹出")
         else:
             self.log.warning("未检测到 SKU 浮层，可能该商品直接加购成功")
 
@@ -147,7 +147,7 @@ class DetailPage(BasePage):
             while time.monotonic() < settle:
                 if not self.sku_sheet_open():
                     break
-                time.sleep(0.3)
+                self.dev.wait_short("等 SKU 浮层收起")
 
         # 角标会有一小段延迟才刷新，轮询等它涨上来
         deadline = time.monotonic() + 6.0
@@ -156,7 +156,7 @@ class DetailPage(BasePage):
             if current > baseline:
                 self.log.info("加购成功：角标 %d -> %d", baseline, current)
                 return True
-            time.sleep(0.4)
+            self.dev.wait_short("等购物车角标刷新")
 
         self.log.warning("加购后角标未增长（baseline=%d, 当前=%d）", baseline, self.cart_badge())
         return False

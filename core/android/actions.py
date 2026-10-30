@@ -32,6 +32,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from appium.webdriver.common.appiumby import AppiumBy
 
+from core.android import waits
 from core.config.config import PAGE_SOURCE_DIR, SCREENSHOT_DIR, DeviceConfig
 from core.logger import get_logger
 from data.constant.android import AndroidActions
@@ -170,6 +171,22 @@ class AndroidDevice:
 
     def page_source(self) -> str:
         return self.driver.page_source
+
+    # ---------------- 节奏（随机等待，模拟真人） ---------------- #
+    # 实现全部委托给 core.android.waits，这里只是给设备对象一个顺手的入口：
+    # ``dev.wait_medium("页面跳转")`` 比到处 ``time.sleep(1.0)`` 更可控
+    # （可被 AA_WAIT_SCALE 统一缩放）。
+    def wait_short(self, reason: str = "") -> float:
+        """短随机等待（0.20~0.55s）：点击后的状态刷新、轮询间隙。"""
+        return waits.wait_short(reason)
+
+    def wait_medium(self, reason: str = "") -> float:
+        """中等随机等待（0.90~1.90s）：页面跳转、tab 切换、输入提交。"""
+        return waits.wait_medium(reason)
+
+    def wait_long(self, reason: str = "") -> float:
+        """长随机等待（2.20~4.20s）：冷启动、重渲染页面、恢复前台。"""
+        return waits.wait_long(reason)
 
     # ---------------- 查找 ---------------- #
     def find(self, selector: str, timeout: float = AndroidActions.TIMEOUT.value, visible: bool = True):
@@ -326,7 +343,7 @@ class AndroidDevice:
                 logger.info("第 %d 次滑动后找到文本 %r", i, text)
                 return True
             self.swipe_direction(direction, scale=0.5)
-            time.sleep(0.4)
+            self.wait_short("滑动后等列表稳定")
         return self.exists(f"text~={text}", timeout=1.0)
 
     def hide_keyboard(self) -> None:
@@ -353,7 +370,7 @@ class AndroidDevice:
             raise ValueError("未提供 package，无法启动应用")
         logger.info("启动应用 %s", pkg)
         self.driver.activate_app(pkg)
-        time.sleep(1.0)
+        self.wait_medium("应用启动后等首屏")
 
     def terminate_app(self, package: str | None = None) -> None:
         pkg = package or self.cfg.app_package

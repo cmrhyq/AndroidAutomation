@@ -61,7 +61,7 @@ class FeedChannelBar(BasePage):
         while time.monotonic() < deadline:
             if self.is_selected(channel):
                 return True
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("等频道选中态刷新")
         return False
 
     def select(self, channel: str, timeout: float = 6.0, attempts: int = 3) -> None:
@@ -83,7 +83,7 @@ class FeedChannelBar(BasePage):
             if self._wait_selected(channel, 6.0):
                 return
             self.log.warning("第 %d 次点击 %r 未生效，重试", attempt, channel)
-            time.sleep(1.0)
+            self.dev.wait_medium(f"重试切换频道 {channel}")
         raise PageNotReadyError(
             f"[{self.name}] 频道 {channel!r} 切换失败：{attempts} 次点击后选中态仍未变化（activity={self.activity}）"
         )

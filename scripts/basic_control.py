@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import time
 
 from _bootstrap import bootstrap, hr
 
@@ -42,7 +41,7 @@ def main() -> int:
         # 1. 回到桌面，确保起点确定
         print("[1/6] 按 Home 回到桌面")
         dev.press("home")
-        time.sleep(1.0)
+        dev.wait_medium("回到桌面后等启动器就绪")
 
         # 2. 确认应用已安装
         if not dev.is_app_installed(args.package):
@@ -53,7 +52,7 @@ def main() -> int:
         # 3. 启动应用
         print(f"[3/6] 启动应用 {args.package}")
         dev.launch_app(args.package)
-        time.sleep(2.0)
+        dev.wait_long("冷启动后等首屏渲染")
         print(f"       当前 Activity: {dev.current_activity}")
 
         # 4. 截图首屏
@@ -63,7 +62,7 @@ def main() -> int:
         # 5. 滑动浏览
         print("[5/6] 向上滑动浏览内容")
         dev.swipe_direction("up", scale=0.5)
-        time.sleep(1.0)
+        dev.wait_medium("滑动后等内容渲染")
         dev.screenshot("basic_02_scrolled")
 
         # 6. 可选：点击关键字
@@ -71,7 +70,7 @@ def main() -> int:
             print(f"[6/6] 尝试点击包含 {args.keyword!r} 的控件")
             if dev.exists(f"text~={args.keyword}", timeout=5):
                 dev.tap(f"text~={args.keyword}")
-                time.sleep(1.5)
+                dev.wait_medium("点击后等页面响应")
                 print(f"       点击后 Activity: {dev.current_activity}")
                 dev.screenshot("basic_03_after_tap")
             else:

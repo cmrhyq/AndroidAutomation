@@ -22,7 +22,6 @@
 from __future__ import annotations
 
 import re
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -204,7 +203,7 @@ class CoinPage(BasePage):
 
         self.log.info("点击签到: %s", selector)
         self.tap_center(selector, timeout=2.0)
-        time.sleep(1.0)
+        self.dev.wait_medium("签到后等状态与余额刷新")
         return True
 
     def do_task(self, index: int = 0) -> bool:

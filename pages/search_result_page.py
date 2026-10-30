@@ -138,7 +138,7 @@ class SearchResultPage(BasePage):
             if self.probe(*self.EMPTY_SELECTORS):
                 self.log.info("命中无结果提示: %s", self.probe(*self.EMPTY_SELECTORS))
                 return False
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("等商品卡片渲染")
         return bool(self._card_elements())
 
     def is_empty(self, timeout: float = 3.0) -> bool:
@@ -170,7 +170,7 @@ class SearchResultPage(BasePage):
             raise AssertionError(f"排序栏未找到 {label!r}（当前 activity={self.activity}）")
         self.log.info("切换排序: %s -> %s", label, selector)
         self.tap_center(selector)
-        time.sleep(2.0)
+        self.dev.wait_long("排序切换后等列表重排")
 
     # ------------------------------------------------------------------ #
     # 进入详情
@@ -185,7 +185,7 @@ class SearchResultPage(BasePage):
             cards = self._card_elements()
             if len(cards) > index:
                 break
-            time.sleep(self.poll_interval)
+            self.dev.wait_short("等商品卡片可点")
 
         if len(cards) > index:
             el, desc, title, price = cards[index]
