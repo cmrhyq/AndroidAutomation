@@ -165,6 +165,7 @@ addopts = [
     "--tb=short",                    # 简短的 traceback
 ]
 markers = [
+    "android: Android自动化测试",
     "device: 需要真实设备/模拟器在线的用例（无设备时由 conftest 自动 skip）",
     "unit: 单元测试（快速，无外部依赖）",
     "integration: 集成测试（可能依赖外部服务）",

@@ -97,7 +97,12 @@ def test_categories_json_is_valid():
     for item in payload:
         assert item["name"], "分类必须有名字"
         assert item["matchedStatuses"], f"{item['name']} 缺少 matchedStatuses"
-        assert item["messageRegex"].startswith(".*"), "Java regex 是全匹配，必须用 .* 包住"
+        pattern = item["messageRegex"]
+        # Allure 用 Java 正则做全匹配：两端必须 .* 兜住，且要 (?s) 让 . 跨行，
+        # 否则多行的异常 message 一律匹配不上。
+        assert pattern.startswith("(?s)"), f"{item['name']} 需要 (?s) 前缀（. 默认不跨行，多行异常会漏匹配）"
+        body = pattern[len("(?s)") :]
+        assert body.startswith(".*") and body.endswith(".*"), f"{item['name']} 的 messageRegex 两端必须用 .* 包住"
 
 
 def test_categories_put_device_failures_first():

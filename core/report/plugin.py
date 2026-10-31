@@ -149,13 +149,22 @@ def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config
 
 
 def _decorate(item: pytest.Item) -> None:
-    """给单个用例挂 Allure 元信息。"""
-    title = _title(item)
-    try:
-        item.obj.__allure_display_name__ = title  # type: ignore[attr-defined]
-    except (AttributeError, TypeError, ValueError):
-        pass
+    """给单个用例挂 Allure 元信息。
 
+    原则：**用例上显式写的注解优先**（``@allure.title`` / ``@allure.story`` /
+    ``@allure.severity`` / ``@allure.description``），这里只给没写的项兜底。
+    否则业务同学写的严重度会被按 marker 推出来的值盖掉，改了半天没反应。
+    """
+    obj = getattr(item, "obj", None)
+    explicit_title = getattr(obj, "__allure_display_name__", None)
+    title = explicit_title or _title(item)
+    if not explicit_title:
+        try:
+            obj.__allure_display_name__ = title  # type: ignore[attr-defined]
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    declared = _declared_label_types(item)
     markers = _markers(item)
     for label_type, value in (
         ("epic", _EPIC),
@@ -163,11 +172,35 @@ def _decorate(item: pytest.Item) -> None:
         ("story", title),
         ("severity", _severity(markers)),
     ):
+        if label_type in declared:
+            continue
         item.add_marker(pytest.mark.allure_label(value, label_type=label_type))
 
-    description = _description(item)
-    if description:
-        item.add_marker(pytest.mark.allure_description(description))
+    if not _has_description_mark(item):
+        description = _description(item)
+        if description:
+            item.add_marker(pytest.mark.allure_description(description))
+
+
+def _declared_label_types(item: pytest.Item) -> set[str]:
+    """用例上已经显式声明的 allure label 类型（epic/feature/story/severity…）。"""
+    types: set[str] = set()
+    try:
+        marks = list(item.iter_markers(name="allure_label"))
+    except Exception:  # noqa: BLE001 - 读不到就当没写，走兜底
+        return types
+    for mark in marks:
+        label_type = mark.kwargs.get("label_type")
+        if label_type:
+            types.add(str(label_type))
+    return types
+
+
+def _has_description_mark(item: pytest.Item) -> bool:
+    try:
+        return any(True for _ in item.iter_markers(name="allure_description"))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _severity(markers: list[str]) -> str:
@@ -207,6 +240,11 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     config._allure_env = info  # type: ignore[attr-defined]
 
     if config.getoption("--no-allure-generate"):
+        return
+
+    # --collect-only 没跑用例，生成出来是一份 0 条的空报告，
+    # 还会把上一次的真实报告覆盖掉（--clean）。所以直接跳过。
+    if config.option.collectonly:
         return
 
     started = getattr(config, "_allure_started", time.time())
