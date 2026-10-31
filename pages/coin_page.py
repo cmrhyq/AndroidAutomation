@@ -1,33 +1,17 @@
 """淘金币页面对象。
 
-真机实测结论（2026-10-31，PFGM00 / Android 12）
-------------------------------------------------
-点「领淘金币」进去的页面**有两种形态**，都会遇到：
-
-1. **双 11 金币小镇**（themis 容器 ``TMSActivity``）：105 个原生节点、
-   **零 text / content-desc**，余额和签到完全读不到 —— 只能截图留证。
-2. **原生/半原生金币页**：能读到 ``淘金币`` 等文案，但**元素数量巨大**，
-   一次 ``find_elements`` 遍历要数秒。
-
-所以本文件的原则是 **一次遍历取全量**（``snapshot()``），绝不为每个字段各遍历一遍。
-
-性能与正确性红线（都是实测踩出来的）
-------------------------------------
-- 9 个候选选择器逐个 ``find_elements`` ≈ **98 秒**。候选数量必须克制。
-- 余额解析不能用「纯数字」正则 —— 页面上有超长数字节点，
-  会把 ``1234567890123456789`` 当成金币余额（真发生过）。
-  因此只从**含「金币」的文案**里取，并做 0~1000 万的区间校验。
-"""
+页面有两种形态：双 11 金币小镇（themis 容器，零 text/desc，只能截图）与原生/半原生页。
+原生节点数量极大，字段一律由 snapshot() 一次遍历取回，不要逐字段各遍历一遍。"""
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
 from selenium.webdriver.common.by import By
 
+from core import get_logger
 from core.android.actions import to_by
 from data.constant.taobao import (
     COIN_BALANCE_PATTERNS,
@@ -35,28 +19,14 @@ from data.constant.taobao import (
     COIN_PAGE_READY_DESCS,
     COIN_TASK_ACTION_TEXTS,
 )
+from data.entity.taobao import CoinSnapshot
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 #: 金币余额合理区间上限（超过这个数一定是把页面上的其它数字吃进来了）
 MAX_REASONABLE_BALANCE = 10_000_000
-
-
-@dataclass
-class CoinSnapshot:
-    """一次遍历得到的金币页状态快照。"""
-
-    #: 金币余额（-1 = 读不到）
-    balance: int = -1
-    #: 今日是否已签到
-    signed: bool = False
-    #: 任务名列表
-    tasks: list[str] = field(default_factory=list)
-    #: 本次遍历拿到的有效文案节点数（0 基本等于「整页是渲染层」）
-    text_nodes: int = 0
-
-    @property
-    def readable(self) -> bool:
-        return self.text_nodes > 0
 
 
 class CoinPage(BasePage):
@@ -139,7 +109,7 @@ class CoinPage(BasePage):
                         continue
                     if 0 <= value <= MAX_REASONABLE_BALANCE:
                         return value
-                    self.log.warning("余额解析 %d 超出合理区间，已忽略（原文 %r）", value, raw)
+                    logger.warning("余额解析 %d 超出合理区间，已忽略（原文 %r）", value, raw)
         return -1
 
     def snapshot(self) -> CoinSnapshot:
@@ -151,7 +121,7 @@ class CoinPage(BasePage):
         整个会话报废）。所以命中渲染容器时**直接返回空快照**，不遍历。
         """
         if self.on_coin_container():
-            self.log.info("金币页为 themis/Weex 渲染容器，跳过内容遍历（避免 instrumentation 崩溃），返回空快照")
+            logger.info("金币页为 themis/Weex 渲染容器，跳过内容遍历（避免 instrumentation 崩溃），返回空快照")
             return CoinSnapshot()
         texts = self._visible_texts()
         snap = CoinSnapshot(text_nodes=len(texts))
@@ -185,23 +155,23 @@ class CoinPage(BasePage):
     def sign_in(self) -> bool:
         """执行签到。已签到 / 找不到按钮 / 渲染层页面都返回 False（不抛异常）。"""
         if self.on_coin_container():
-            self.log.warning("金币页是 themis/Weex 渲染容器，原生无签到按钮可点，跳过签到（以截图留证）")
+            logger.warning("金币页是 themis/Weex 渲染容器，原生无签到按钮可点，跳过签到（以截图留证）")
             return False
 
         if self.signed_today():
-            self.log.info("今日已签到，跳过")
+            logger.info("今日已签到，跳过")
             return False
 
         # 候选只有 3 个，且只做一次探测，不做多轮轮询（避免秒级遍历被成倍放大）
         selector = self.exists_any(*self.SIGN_SELECTORS, timeout=2.0)
         if not selector:
-            self.log.warning(
+            logger.warning(
                 "未找到签到按钮（候选 %s 均未命中）：金币页可能是 themis 渲染，或当前无签到位",
                 list(self.SIGN_SELECTORS),
             )
             return False
 
-        self.log.info("点击签到: %s", selector)
+        logger.info("点击签到: %s", selector)
         self.tap_center(selector, timeout=2.0)
         self.dev.wait_medium("签到后等状态与余额刷新")
         return True
@@ -218,11 +188,11 @@ class CoinPage(BasePage):
             for element in elements:
                 if hit == index:
                     rect = element.rect
-                    self.log.info("点击第 %d 个任务按钮 %r", index + 1, selector)
+                    logger.info("点击第 %d 个任务按钮 %r", index + 1, selector)
                     self.dev.tap_xy(rect["x"] + rect["width"] // 2, rect["y"] + rect["height"] // 2)
                     return True
                 hit += 1
-        self.log.warning("任务列表里只有 %d 个可点按钮，取不到第 %d 个", hit, index + 1)
+        logger.warning("任务列表里只有 %d 个可点按钮，取不到第 %d 个", hit, index + 1)
         return False
 
     def close(self) -> bool:
@@ -253,7 +223,7 @@ class CoinPage(BasePage):
         还可能把 instrumentation 拖崩；而 Activity 是免费且可靠的信号。
         """
         if self.on_coin_container():
-            self.log.info(
+            logger.info(
                 "金币页已跳转（activity=%s）。themis/Weex 渲染容器，跳过内容遍历"
                 "（全量遍历会拖崩 instrumentation），余额与签到状态改由截图留证",
                 self.activity,
@@ -263,7 +233,7 @@ class CoinPage(BasePage):
         try:
             self.wait_any(*self.ready_selectors, timeout=timeout)
         except Exception:  # noqa: BLE001 - 内容层读不到属预期
-            self.log.warning(
+            logger.warning(
                 "金币页判定失败（%.1fs）：内容节点未命中，且 activity=%s 不含金币容器特征。"
                 "可调用 calibrate() 导层级后补齐 ready_selectors / ACTIVITY_HINTS",
                 timeout,
@@ -271,7 +241,7 @@ class CoinPage(BasePage):
             )
             return False
 
-        self.log.info("金币页就绪（已识别到内容节点）")
+        logger.info("金币页就绪（已识别到内容节点）")
         return True
 
     # ------------------------------------------------------------------ #
@@ -284,5 +254,5 @@ class CoinPage(BasePage):
         """导出截图 + UI 层级，用于补齐本页的候选选择器。"""
         shot = self.screenshot("calibrate")
         xml = self.dump("calibrate")
-        self.log.info("金币页校准产物: screenshot=%s xml=%s", shot, xml)
+        logger.info("金币页校准产物: screenshot=%s xml=%s", shot, xml)
         return shot, xml

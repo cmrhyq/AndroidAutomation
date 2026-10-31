@@ -1,30 +1,22 @@
-"""推荐页顶部频道栏组件（关注 / 推荐 / 闪购 / 双11 / 国补 …）。
+"""推荐页顶部频道栏组件（关注 / 推荐 / 闪购 …）。
 
-真机实测（``artifacts/pages/home_live.xml``）
---------------------------------------------
-频道 tab 的 ``content-desc`` 直接带选中态：
-
-    desc='关注,未选中'   bounds=[49,131][141,191]
-    desc='推荐,已选中'   bounds=[186,127][290,195]
-    desc='闪购,未选中'   bounds=[335,131][503,191]
-
-也就是说**选中状态是可断言的**，不需要靠颜色或样式判断 —— 这是推荐页里
-少数几个可以做精确断言的地方（商品流本身全是 Weex 卡片）。
-
-注意 ``双11`` 频道没有「,未选中」后缀，desc 就是 ``双11``，
-所以候选里同时给「带后缀」和「裸名」两种写法。
-"""
+频道 desc 自带选中态后缀（「推荐,已选中」/「销量,未选中」），选中状态可直接断言；
+个别频道（如「双11」）没有后缀，故候选里同时给带后缀与裸名两种写法。"""
 
 from __future__ import annotations
 
 import time
 
+from core.logger import get_logger
 from data.constant.taobao import (
     FEED_CHANNEL_SELECTED_HINT,
     FEED_CHANNEL_UNSELECTED_HINT,
     FEED_CHANNELS,
 )
 from pages.base_page import BasePage, PageNotReadyError
+
+
+logger = get_logger(__name__)
 
 
 class FeedChannelBar(BasePage):
@@ -77,12 +69,12 @@ class FeedChannelBar(BasePage):
                 raise PageNotReadyError(
                     f"[{self.name}] 未找到频道 {channel!r}（候选 {list(selectors)}，activity={self.activity}）"
                 )
-            self.log.info("切换到频道: %s（第 %d/%d 次）", channel, attempt, attempts)
+            logger.info("切换到频道: %s（第 %d/%d 次）", channel, attempt, attempts)
             self.tap_center(*selectors, timeout=timeout)
             # 频道内容是懒加载的，切换后首个屏幕要重新渲染，给足 6s
             if self._wait_selected(channel, 6.0):
                 return
-            self.log.warning("第 %d 次点击 %r 未生效，重试", attempt, channel)
+            logger.warning("第 %d 次点击 %r 未生效，重试", attempt, channel)
             self.dev.wait_medium(f"重试切换频道 {channel}")
         raise PageNotReadyError(
             f"[{self.name}] 频道 {channel!r} 切换失败：{attempts} 次点击后选中态仍未变化（activity={self.activity}）"

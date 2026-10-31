@@ -1,36 +1,8 @@
 """淘宝商品详情页页面对象。
 
-真机实测结构（PFGM00 / 淘宝 10.x / 1080x2400）
-------------------------------------------------
-**1. 加购按钮点不动是个坑**
-
-    desc="加入购物车"  FrameLayout [397,2220][727,2400]  clickable=false
-
-``clickable`` 是 false，用 WebDriver 的 ``element.click()`` 会静默失败。
-必须按坐标点击 —— 所以走 ``tap_center``。
-
-**2. SKU 规格浮层是 Weex，没有任何原生节点**
-
-点底部「加入购物车」后会弹出「颜色分类 / 数量」浮层，把浮层打开时的
-UI 层级导出来看，``text=加入购物车``、``desc=加入购物车`` 全部返回 0 个。
-也就是说浮层内部完全拿不到选择器，只能按坐标点它底部那颗橙色按钮
-（实测相对坐标约为 (0.5, 0.939)）。
-
-**3. 浮层是否打开，有个免费判据**
-
-浮层一旦弹出，底部原生栏（含 ``desc=加入购物车``）就查不到了。
-于是 ``浮层打开 ⇔ desc=加入购物车 消失``，不用额外探测。
-
-**4. 加购成功判据用购物车角标**
-
-「加购成功」Toast 也在 Weex 里读不到，但顶部购物车图标右上角的数量角标
-是**原生 TextView**（实测 ``text="1"`` @ rect x=913,y=132），可靠且无时序问题。
-
-**5. 详情页 page_source 会卡**
-
-详情页是 Weex + 视频，``driver.page_source`` 可能长时间不返回，
-因此本页**不要**调用 ``dump()``，需要探测一律走 ``find_elements``。
-"""
+页面为 Weex 渲染：加购按钮 clickable=false、SKU 浮层无原生节点，只能按坐标点击；
+加购是否成功以顶部购物车角标（原生 TextView）判定。
+本页不要调用 dump()，page_source 可能长时间不返回，探测一律走 find_elements。"""
 
 from __future__ import annotations
 
@@ -39,10 +11,14 @@ from typing import TYPE_CHECKING
 
 from selenium.common.exceptions import WebDriverException
 
+from core import get_logger
 from pages.base_page import BasePage
+
 
 if TYPE_CHECKING:
     from pages.cart_page import CartPage
+
+logger = get_logger(__name__)
 
 
 class DetailPage(BasePage):
@@ -126,18 +102,18 @@ class DetailPage(BasePage):
         流程：点底部加购 → 等 SKU 浮层 → 坐标点浮层确认 → 校验角标。
         """
         baseline = self.cart_badge()
-        self.log.info("加购前角标 = %d", baseline)
+        logger.info("加购前角标 = %d", baseline)
 
         self.tap_center(*self.ADD_CART_SELECTORS, timeout=timeout)
         # 等浮层弹出（原生加购按钮消失）
         deadline = time.monotonic() + 6.0
         while time.monotonic() < deadline:
             if self.sku_sheet_open():
-                self.log.info("SKU 浮层已弹出")
+                logger.info("SKU 浮层已弹出")
                 break
             self.dev.wait_short("等 SKU 浮层弹出")
         else:
-            self.log.warning("未检测到 SKU 浮层，可能该商品直接加购成功")
+            logger.warning("未检测到 SKU 浮层，可能该商品直接加购成功")
 
         if self.sku_sheet_open():
             # 浮层内是 Weex，只能按坐标点底部确认按钮
@@ -154,11 +130,11 @@ class DetailPage(BasePage):
         while time.monotonic() < deadline:
             current = self.cart_badge()
             if current > baseline:
-                self.log.info("加购成功：角标 %d -> %d", baseline, current)
+                logger.info("加购成功：角标 %d -> %d", baseline, current)
                 return True
             self.dev.wait_short("等购物车角标刷新")
 
-        self.log.warning("加购后角标未增长（baseline=%d, 当前=%d）", baseline, self.cart_badge())
+        logger.warning("加购后角标未增长（baseline=%d, 当前=%d）", baseline, self.cart_badge())
         return False
 
     def open_cart(self, timeout: float = 10.0) -> CartPage:
@@ -181,5 +157,5 @@ class DetailPage(BasePage):
     # ------------------------------------------------------------------ #
     def dump(self, tag: str = "ui"):  # type: ignore[override]
         """详情页禁用 UI 导出 —— Weex + 视频会让 page_source 长时间阻塞。"""
-        self.log.warning("详情页 page_source 可能长时间阻塞，已跳过 dump（tag=%s）", tag)
+        logger.warning("详情页 page_source 可能长时间阻塞，已跳过 dump（tag=%s）", tag)
         return None

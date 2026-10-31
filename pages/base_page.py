@@ -1,17 +1,7 @@
-"""页面对象基类：多候选选择器轮询、显式等待、滚动查找、异常留证。
+"""页面对象基类：多候选选择器轮询、显式等待、滚动查找、失败留证。
 
-设计要点
---------
-1. **多候选选择器**：淘宝 UI 改版频繁，同一个元素往往有多个特征可用。
-   页面对象统一用「候选元组 + 轮询」的方式定位，任一命中即算成功，
-   比写死单一 xpath 稳定得多。
-2. **不做隐式等待**：与 ``AndroidDevice`` 保持一致，全部走显式轮询，
-   避免等待时间被放大（项目约定 implicit wait 恒为 0）。
-3. **探测不阻塞**：``probe`` 用一次 ``find_elements`` 瞬时判断，
-   轮询由 ``wait_any`` 控制节奏，避免多候选串行等待导致超时成倍放大。
-4. **等待节奏统一**：所有睡眠都走系统级的 ``wait_short/medium/long``
-   （``core.android.waits``），不再出现裸 ``time.sleep`` 与写死的轮询间隔。
-"""
+候选元组 + 轮询定位（淘宝改版频繁，任一特征命中即算成功）；
+全部显式等待（implicit wait 恒为 0），等待节奏走 core.android.waits 的三档方法。"""
 
 from __future__ import annotations
 
@@ -23,6 +13,9 @@ from selenium.common.exceptions import StaleElementReferenceException, WebDriver
 from core.android.actions import AndroidDevice, Screen, to_by
 from core.logger import get_logger
 from data.constant.taobao import TAOBAO_PACKAGE
+
+
+logger = get_logger(__name__)
 
 
 class PageNotReadyError(AssertionError):
@@ -43,7 +36,6 @@ class BasePage:
 
     def __init__(self, dev: AndroidDevice) -> None:
         self.dev = dev
-        self.log = get_logger(f"pages.{self.name}")
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} name={self.name!r}>"
@@ -101,7 +93,7 @@ class BasePage:
         if not self.ready_selectors:
             return self
         self.wait_any(*self.ready_selectors, timeout=timeout)
-        self.log.info("页面就绪: %s", self.name)
+        logger.info("页面就绪: %s", self.name)
         return self
 
     def wait_leave(self, timeout: float | None = None) -> bool:
@@ -134,7 +126,7 @@ class BasePage:
     def tap_any(self, *selectors: str, timeout: float | None = None) -> str:
         """点击第一个命中的候选元素，返回命中的选择器。"""
         selector = self.wait_any(*selectors, timeout=timeout)
-        self.log.info("点击 %s", selector)
+        logger.info("点击 %s", selector)
         self.dev.tap(selector)
         return selector
 
@@ -159,18 +151,18 @@ class BasePage:
         selector = self.wait_any(*selectors, timeout=timeout)
         rect = self.rect_of(selector)
         if rect is None:
-            self.log.warning("%s 取不到 rect，退化为元素点击", selector)
+            logger.warning("%s 取不到 rect，退化为元素点击", selector)
             self.dev.tap(selector)
             return selector
         x = rect["x"] + rect["width"] // 2
         y = rect["y"] + rect["height"] // 2
-        self.log.info("坐标点击 %s @ (%d, %d)", selector, x, y)
+        logger.info("坐标点击 %s @ (%d, %d)", selector, x, y)
         self.dev.tap_xy(x, y)
         return selector
 
     def tap_relative(self, rx: float, ry: float, reason: str = "") -> None:
         """按屏幕相对坐标点击（Weex 浮层等拿不到原生节点的场景）。"""
-        self.log.info("相对坐标点击 (%.3f, %.3f) %s", rx, ry, reason)
+        logger.info("相对坐标点击 (%.3f, %.3f) %s", rx, ry, reason)
         self.dev.tap_relative(rx, ry)
 
     def text_of_any(self, *selectors: str, timeout: float = 3.0, default: str = "") -> str:
@@ -208,11 +200,11 @@ class BasePage:
             self.dev.wait_short("轮询等待")
 
     def type_text(self, selector: str, text: str, clear: bool = True) -> None:
-        self.log.info("输入 %r -> %s", text, selector)
+        logger.info("输入 %r -> %s", text, selector)
         self.dev.input_text(selector, text, clear=clear)
 
     def back(self) -> None:
-        self.log.info("返回上一页")
+        logger.info("返回上一页")
         self.dev.press("back")
 
     def scroll_down(self, times: int = 1, scale: float = 0.6) -> None:

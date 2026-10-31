@@ -1,37 +1,4 @@
-"""淘金币链路用例：首页 → 推荐页入口 → 金币中心。
-
-覆盖范围
---------
-1. **首页连通性** —— 金币链路的前置条件
-2. **入口投放探测** —— 只探测不点击，适合做活动位投放监控
-3. **进入金币中心** —— 页面可达 + 截图留证
-
-三条用例**互不依赖**：每条都自己 ``flow.start()``，单独用 ``-k`` 跑一条也能跑通
-（不要用 ``pytest-dependency`` 串起来，一旦前一条失败，后面的用例会集体 skip，
-报告里看不出到底是哪一层坏了）。
-
-判定分级（重要）
-----------------
-金币小镇是 themis 渲染容器，``page_source`` 里读不到原生业务节点，余额常常拿不到。
-所以内容级校验按能力分级：**能读到余额才校验数值，读不到只要求「页面可达 + 截图留证」**，
-不把渲染层限制算成用例失败。同一套策略也用在购物车页（见 ``pages/cart_page.py``）。
-
-前置条件
---------
-1. ``adb devices`` 能看到 ``device``
-2. 设备已安装淘宝（``com.taobao.taobao``）
-3. Appium 就绪，或 ``AUTO_START_APPIUM=true`` 由框架自动拉起
-
-无设备 / Appium 不可用时由 ``tests/conftest.py`` 整体 skip，不会 fail。
-
-运行
-----
-    .venv/Scripts/python.exe -m pytest tests/test_golden_coin.py -v
-    .venv/Scripts/python.exe -m pytest tests/test_golden_coin.py -v -k entry      # 只跑入口探测
-    AA_WAIT_SCALE=2 .venv/Scripts/python.exe -m pytest tests/test_golden_coin.py  # 放慢观察
-
-跑完自动产出 Allure 报告（``artifacts/allure-report``），``--allure-open`` 可直接打开。
-"""
+"""淘金币链路用例：首页 → 推荐页入口 → 金币中心。"""
 
 from __future__ import annotations
 
@@ -74,6 +41,7 @@ class TestGoldenCoin:
         "失败时优先确认：App 是否已安装、首页选择器是否随版本改版（用 "
         "`scripts/ui_dump.py` 导层级对照）。"
     )
+    @pytest.mark.order(1)
     def test_home_launch(self, flow: TaobaoFlow) -> None:
         """启动淘宝后能进入首页（连通性冒烟）"""
         with allure.step("启动淘宝并等待首页就绪"):
@@ -100,6 +68,7 @@ class TestGoldenCoin:
         "只探测不点击，可用于日常的入口投放监控。挂件是**活动位**（双 11 / 618 会整块换皮肤），"
         "未投放算 skip 而不是 fail；同时把现场截图挂进报告，用来区分「真的没投放」和「选择器失效」。"
     )
+    @pytest.mark.order(2)
     def test_coin_entry_visible(self, flow: TaobaoFlow) -> None:
         """推荐页「领淘金币」入口按活动位投放（未投放则跳过）"""
         with allure.step("回到首页推荐流"):
@@ -126,6 +95,7 @@ class TestGoldenCoin:
         "所以判定是「页面可达 + 截图留证」；只有读到余额时才额外校验数值区间，"
         "不把渲染层限制算成失败。"
     )
+    @pytest.mark.order(3)
     def test_open_golden_coin(self, flow: TaobaoFlow) -> None:
         """推荐页入口可进入金币中心并留证"""
         with allure.step("回到首页并确认金币入口已投放"):
@@ -167,3 +137,8 @@ class TestGoldenCoin:
             assert snapshot.balance < 100_000_000, (
                 f"金币余额解析为 {snapshot.balance}，超出合理区间，疑似把「金币」附近的其它数字当成了余额"
             )
+
+    def test_check_task(self, flow: TaobaoFlow) -> None:
+        """
+        检查淘金币任务，获取能做的任务
+        """

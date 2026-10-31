@@ -191,14 +191,9 @@ def create_driver(cfg: DeviceConfig | None = None, start_server: bool = True):
 def _disable_wait_for_idle(driver) -> None:
     """关掉 uiautomator 的 waitForIdle，否则点击可能无限期挂起。
 
-    这是本项目踩过最深的坑：uiautomator2 driver 在执行 click/swipe 之后会
-    调用 ``UiDevice.waitForIdle()``，默认等界面「静止」。而淘宝首页/详情页
-    常年跑着自动播放视频、轮播图、悬浮动画，界面永远不会 idle ——
-    实测表现为：日志打完「点击 xxx」之后进程就**永久卡住**（不是超时，
-    WebDriverWait 的 timeout 对它无效，因为请求已经发到设备端了）。
-
-    把 ``waitForIdleTimeout`` 设为 0 即不再等待，同时也能显著提升执行速度。
-    该设置是会话级的，通过 /appium/settings 接口下发。
+    uiautomator2 在 click/swipe 后会调 UiDevice.waitForIdle()，而淘宝页面常年播放视频
+    动画、永不 idle，实测会卡死（WebDriverWait 的 timeout 管不到，命令已下发到设备）。
+    waitForIdleTimeout=0 即不再等待，顺带提升执行速度。
     """
     try:
         driver.update_settings({"waitForIdleTimeout": 0})

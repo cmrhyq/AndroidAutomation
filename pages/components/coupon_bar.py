@@ -1,29 +1,20 @@
-"""推荐页底部领券条组件。
+"""推荐页底部领券条组件（desc=popViewIdentifier）。
 
-真机实测（``artifacts/pages/home_live.xml``）
---------------------------------------------
-领券条是推荐页底部的横条，不是模态弹窗，会挡住商品流底部：
-
-    desc='popViewIdentifier'  bounds=[0,2152][1080,2256]        ← 容器
-    desc='您有'                bounds=[109,2181][183,2226]
-    desc='满120减15'           bounds=[183,2181][357,2226]
-    desc='国际加补券待领取'     bounds=[357,2181][653,2226]
-    desc='立即领取'            bounds=[828,2181][976,2226]      ← 主按钮
-
-它只在有券待领时出现，所以和其它浮层一样必须做「存在才处理」。
-与 ``PopupCleaner`` 的分工：PopupCleaner 处理模态浮层（开屏广告/更新提示），
-这里处理这条常驻业务横条 —— 它的「立即领取」是**有业务副作用**的动作，
-所以默认只关闭不领取。
-"""
+只在有券待领时出现，属常驻业务横条而非模态浮层；
+「立即领取」有业务副作用，默认只关闭不领取。"""
 
 from __future__ import annotations
 
+from core.logger import get_logger
 from data.constant.taobao import (
     COUPON_BAR_CLAIM_DESCS,
     COUPON_BAR_CONTAINER_DESC,
     COUPON_BAR_HINTS,
 )
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 
 class CouponBar(BasePage):
@@ -70,13 +61,13 @@ class CouponBar(BasePage):
     def claim(self, timeout: float = 3.0) -> bool:
         """点击「立即领取」（有业务副作用，用例里要显式决定是否调用）。"""
         if not self.present():
-            self.log.info("当前无领券条，跳过领取")
+            logger.info("当前无领券条，跳过领取")
             return False
         selector = self.exists_any(*self.CLAIM_SELECTORS, timeout=timeout)
         if not selector:
-            self.log.warning("领券条存在但未找到领取按钮，候选=%s", list(self.CLAIM_SELECTORS))
+            logger.warning("领券条存在但未找到领取按钮，候选=%s", list(self.CLAIM_SELECTORS))
             return False
-        self.log.info("点击领券: %s", selector)
+        logger.info("点击领券: %s", selector)
         self.tap_center(selector, timeout=timeout)
         return True
 
@@ -86,7 +77,7 @@ class CouponBar(BasePage):
             return False
         selector = self.exists_any(*self.CLOSE_SELECTORS, timeout=timeout)
         if not selector:
-            self.log.info("领券条无关闭按钮（正常，多数版本只能领取或忽略）")
+            logger.info("领券条无关闭按钮（正常，多数版本只能领取或忽略）")
             return False
         self.tap_center(selector, timeout=timeout)
         return True

@@ -1,10 +1,6 @@
-"""Appium 运行环境解析：优先使用项目内置的 Appium，其次全局安装。
+"""Appium 运行环境解析：优先项目内置安装，其次全局。
 
-为什么需要这一层：Appium 2 与 3 的驱动路由表不兼容，混用会出现会话能建、
-但 current_activity / window_size / press_keycode 等命令全部 404 的诡异现象。
-把 Appium 装在项目内（tools/）并配独立 APPIUM_HOME，就能做到版本自洽、
-不影响本机其他项目。
-"""
+Appium 2 与 3 的驱动路由不兼容，混用会出现会话能建但命令全 404，故需版本自洽。"""
 
 from __future__ import annotations
 

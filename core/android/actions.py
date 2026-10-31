@@ -1,16 +1,8 @@
 """Android 设备控制封装：选择器语法、显式等待、手势、截图、应用管理。
 
-选择器语法（以第一个 = 之前的前缀区分类型）：
-    text=登录            精确文本
-    text~=登录           文本包含
-    id=com.foo:id/btn    资源 id（可省略包名，写 id=btn 时用 contains 匹配）
-    desc=搜索            content-desc
-    xpath=//*[@text="登录"]
-    cls=android.widget.TextView
-    不带前缀：按 text 精确匹配
-
-所有查找都走「显式等待 + 轮询」，不依赖 implicit wait，避免等待时间被放大。
-"""
+选择器以第一个 = 前的前缀区分：text= 精确、text~= 包含、id= 资源 id、
+desc= content-desc、cls= 类名、xpath= 路径；无前缀按 text 精确匹配。
+查找一律显式等待 + 轮询，不依赖 implicit wait。"""
 
 from __future__ import annotations
 
@@ -255,15 +247,10 @@ class AndroidDevice:
         """点击元素。
 
         Args:
-            use_coords: 默认 True —— 取元素 rect 后用坐标点击。
+            use_coords: 默认 True，取元素 rect 后用坐标点击。
 
-        为什么默认不走 ``el.click()``：uiautomator2 driver 的 click 动作会先
-        ``waitForIdle()``，而淘宝首页/详情页持续播放视频和动画，界面永不 idle，
-        实测会**永久挂起**（``WebDriverWait`` 的超时管不到它，因为命令已下发到设备）。
-        取 rect 再用 W3C actions 点击不触发 idle 等待，稳定且更快。
-
-        确实需要原生 click 时（例如某些 WebView 元素必须走点击语义），
-        传 ``use_coords=False``。
+        不走 el.click()：uiautomator2 的 click 会先 waitForIdle，而淘宝页面常年播放视频
+        动画、永不 idle，实测会永久挂起。确实需要原生 click 时传 use_coords=False。
         """
         el = self.find(selector, timeout=timeout)
         logger.info("点击 %s", describe(selector))

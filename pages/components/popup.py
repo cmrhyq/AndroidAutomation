@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from selenium.common.exceptions import WebDriverException
 
+from core.logger import get_logger
 from data.constant.taobao import POPUP_CLOSE_TEXTS
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 
 class PopupCleaner(BasePage):
@@ -35,16 +39,16 @@ class PopupCleaner(BasePage):
             if not hit:
                 break
             try:
-                self.log.info("关闭浮层: %s", hit)
+                logger.info("关闭浮层: %s", hit)
                 self.dev.tap(hit)
             except WebDriverException:
                 # 浮层在这一瞬间自己消失了 / 元素失效，忽略即可
-                self.log.debug("浮层点击失效（忽略）: %s", hit)
+                logger.debug("浮层点击失效（忽略）: %s", hit)
                 continue
             closed += 1
             self.dev.wait_short("等浮层关闭动画")
         if closed:
-            self.log.info("共关闭 %d 个浮层", closed)
+            logger.info("共关闭 %d 个浮层", closed)
         return closed
 
     def dismiss_until(self, done_selector: str, rounds: int = 4, timeout: float = 2.0) -> bool:

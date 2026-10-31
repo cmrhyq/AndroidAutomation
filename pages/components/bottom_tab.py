@@ -7,8 +7,12 @@ text 只有文案、不可点）。所以优先用 desc=，最后退化为相对
 
 from __future__ import annotations
 
+from core.logger import get_logger
 from data.constant.taobao import TAB_CART_TEXTS, TAB_HOME_TEXTS, TAB_MINE_TEXTS
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 
 class BottomTab(BasePage):
@@ -41,11 +45,11 @@ class BottomTab(BasePage):
         """切到指定 tab。"""
         hit = self.exists_any(*self.selectors_for(tab), timeout=timeout)
         if hit:
-            self.log.info("切换 tab: %s (%s)", tab, hit)
+            logger.info("切换 tab: %s (%s)", tab, hit)
             self.dev.tap(hit)
         else:
             rx, ry = self.FALLBACK_POINTS[tab]
-            self.log.warning("未找到 tab 文案，改用坐标点击 %s (%.2f, %.2f)", tab, rx, ry)
+            logger.warning("未找到 tab 文案，改用坐标点击 %s (%.2f, %.2f)", tab, rx, ry)
             self.dev.tap_relative(rx, ry)
         self.dev.wait_medium(f"切换 tab 到 {tab}")
 

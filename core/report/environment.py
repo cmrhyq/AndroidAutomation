@@ -1,20 +1,7 @@
-"""设备与运行环境采集：产出 Allure 的 ``environment.properties``。
+"""环境信息采集：产出 Allure 的 environment.properties。
 
-两级采集
---------
-1. **运行期**（准确）：会话建立后从 driver capabilities 取设备型号、系统版本、
-   分辨率、前台包名 —— 这些只有真连上设备才拿得到。
-2. **静态兜底**（不依赖会话）：会话起来前用 ``adb`` + Appium ``/status`` 补 udid、
-   应用版本、Appium 版本，保证「一条用例都没跑起来」时报告也不是空白。
-
-融合策略：运行期优先，缺什么补什么。
-
-编码坑
-------
-Allure 服务端用 Java ``Properties`` 解析这个文件，那是 **ISO-8859-1** 编码 ——
-中文值（比如搜索关键词「蓝牙耳机」）直接写进去会变乱码。所以非 ASCII 字符统一
-转成 ``\\uXXXX`` 转义，Java 侧会自动还原。
-"""
+运行期从 driver capabilities 取（最准），缺项用 adb + Appium /status 兜底。
+非 ASCII 值需转成 Unicode 转义 —— Allure 按 Java Properties 解析，中文直写会乱码。"""
 
 from __future__ import annotations
 

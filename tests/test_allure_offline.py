@@ -1,18 +1,6 @@
 """报告基建的离线用例：不碰设备、不建 Appium 会话，秒级回归。
 
-为什么要有这组用例
-------------------
-报告是测试的基础设施 —— 它坏掉时最容易被误判成「被测应用有问题」。
-Allure 的 HTML 由官方 CLI 生成，我们真正该守住的是**喂给它的原料**：
-
-- ``environment.properties`` 的编码转义（中文关键词写错就是一堆问号）
-- ``categories.json`` 的结构（错一个字整个分类面板都不生效）
-- ``collector`` 的 no-op 语义与上下文聚合（业务流在脚本里单独跑不能崩）
-
-全部标记 ``unit``，CI 里可单独快跑::
-
-    .venv/Scripts/python.exe -m pytest tests/test_allure_offline.py -q
-"""
+覆盖 environment.properties 编码、categories.json 结构与 collector 的 no-op 语义。"""
 
 from __future__ import annotations
 

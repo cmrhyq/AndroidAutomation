@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from core import get_logger
 from pages.base_page import BasePage
 from pages.components.bottom_tab import BottomTab
 from pages.components.coin_widget import CoinWidget
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from pages.cart_page import CartPage
     from pages.coin_page import CoinPage
     from pages.search_result_page import SearchResultPage
+
+
+logger = get_logger(__name__)
 
 
 class HomePage(BasePage):
@@ -55,7 +59,7 @@ class HomePage(BasePage):
         """首页搜索：点搜索入口 → 输入关键词 → 提交，返回搜索结果页。"""
         from pages.search_result_page import SearchResultPage
 
-        self.log.info("首页搜索: %r", keyword)
+        logger.info("首页搜索: %r", keyword)
         self.search_bar.search_phrase(keyword)
         return SearchResultPage(self.dev).wait_ready()
 
@@ -82,7 +86,7 @@ class HomePage(BasePage):
 
     def refresh_feed(self) -> None:
         """下拉刷新推荐流，并给内容重新加载留出随机等待时间。"""
-        self.log.info("下拉刷新推荐流")
+        logger.info("下拉刷新推荐流")
         self.dev.swipe_direction("down", scale=0.55)
         self.dev.wait_long("下拉刷新后等推荐流加载")
 
@@ -97,7 +101,7 @@ class HomePage(BasePage):
                 if value:
                     texts.append(value)
         except Exception:  # noqa: BLE001 - 商品流节点不稳定，读取失败按「读不到」处理
-            self.log.warning("推荐流文案读取失败（可能整块是 Weex 容器）")
+            logger.warning("推荐流文案读取失败（可能整块是 Weex 容器）")
         return texts
 
     def capture_feed(self, tag: str = "feed") -> Path:

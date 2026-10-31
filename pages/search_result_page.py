@@ -1,22 +1,7 @@
 """淘宝搜索结果页页面对象。
 
-真机实测结构（PFGM00 / 淘宝 10.x / 1080x2400）
-------------------------------------------------
-排序栏位于 y≈728~823，每个排序项的可点击文案挂在 ``content-desc`` 上，
-且带选中态后缀，例如::
-
-    desc="综合"          desc="销量,未选中"     desc="全部,已选中"
-    desc="天猫,未选中"    desc="店铺,未选中"     desc="闪购,未选中"
-    desc="筛选按钮"
-
-商品卡片是**无 resource-id 的 ViewGroup/View**，可点击，真正的商品信息
-拼在 ``content-desc`` 里，格式非常规整::
-
-    【音质TOP·1】德国远超千元音质蓝牙耳机适用苹果华为小米 272.00元 全网5000+人付款
-    千问AI耳夹式耳机 耳夹式蓝牙运动 Bose调音 882.87元 1000+人付款
-
-所以标题和价格直接从 desc 正则解析，比自己拼选择器可靠得多。
-"""
+商品卡片无 resource-id，标题、价格、付款人数都拼在 content-desc 里
+（如「… 272.00元 5000+人付款」），因此从 desc 正则解析而不是自拼选择器。"""
 
 from __future__ import annotations
 
@@ -26,10 +11,14 @@ from typing import TYPE_CHECKING
 
 from selenium.common.exceptions import WebDriverException
 
+from core import get_logger
 from pages.base_page import BasePage
 
 if TYPE_CHECKING:
     from pages.detail_page import DetailPage
+
+
+logger = get_logger(__name__)
 
 #: 卡片 desc 里的价格段：「272.00元」「69元」
 _PRICE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*元")
@@ -136,7 +125,7 @@ class SearchResultPage(BasePage):
             if self._card_elements():
                 return True
             if self.probe(*self.EMPTY_SELECTORS):
-                self.log.info("命中无结果提示: %s", self.probe(*self.EMPTY_SELECTORS))
+                logger.info("命中无结果提示: %s", self.probe(*self.EMPTY_SELECTORS))
                 return False
             self.dev.wait_short("等商品卡片渲染")
         return bool(self._card_elements())
@@ -168,7 +157,7 @@ class SearchResultPage(BasePage):
         selector = self.exists_any(f"desc~={key}", timeout=5.0)
         if not selector:
             raise AssertionError(f"排序栏未找到 {label!r}（当前 activity={self.activity}）")
-        self.log.info("切换排序: %s -> %s", label, selector)
+        logger.info("切换排序: %s -> %s", label, selector)
         self.tap_center(selector)
         self.dev.wait_long("排序切换后等列表重排")
 
@@ -192,10 +181,10 @@ class SearchResultPage(BasePage):
             rect = el.rect
             x = rect["x"] + rect["width"] // 2
             y = rect["y"] + rect["height"] // 2
-            self.log.info("打开第 %d 个商品: %r %s @ (%d, %d)", index + 1, title[:24], price, x, y)
+            logger.info("打开第 %d 个商品: %r %s @ (%d, %d)", index + 1, title[:24], price, x, y)
             self.dev.tap_xy(x, y)
         else:
-            self.log.warning("未识别到商品卡片（共 %d 张），退化为坐标点击首个结果", len(cards))
+            logger.warning("未识别到商品卡片（共 %d 张），退化为坐标点击首个结果", len(cards))
             self.tap_relative(0.5, 0.58, reason="商品卡片未识别")
 
         return DetailPage(self.dev).wait_ready(timeout=timeout)

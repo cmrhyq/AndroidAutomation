@@ -1,11 +1,6 @@
 """基础控制演示：启动应用 → 等待界面 → 滑动 → 截图 → 返回。
 
-默认对未来「设置」应用做演示（所有 Android 都有，适合验证链路）。
-也可以指定自己的应用:
-
-    python scripts/basic_control.py --package com.tencent.mm
-    python scripts/basic_control.py --package com.android.settings --activity .Settings
-"""
+默认对系统「设置」演示，可用 --package / --activity 指定其它应用。"""
 
 from __future__ import annotations
 

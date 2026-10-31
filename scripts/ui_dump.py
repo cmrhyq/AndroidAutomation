@@ -1,10 +1,6 @@
-"""UI 层级导出 + 可交互元素清单，写用例前先跑它来选选择器。
+"""UI 层级导出与可交互元素清单，写用例前用它来选选择器。
 
-用法:
-    python scripts/ui_dump.py                 # 导出当前界面
-    python scripts/ui_dump.py --grep 设置      # 只看含关键字的元素
-    python scripts/ui_dump.py --clickable     # 只看可点击元素
-"""
+    python scripts/ui_dump.py [--grep 关键字] [--clickable]"""
 
 from __future__ import annotations
 

@@ -1,15 +1,7 @@
 """淘宝业务流：把页面对象编排成可复用的端到端链路。
 
-分层职责
---------
-- pages   ：单个页面能做什么（点这里、读那个）
-- flows   ：跨页面的一段业务（启动→搜索→进详情→加购→回购物车校验）
-- tests   ：只做「调用业务流 + 断言结果」
-
-每一步都包在 ``core.report.step()`` 里 —— 这样报告里能看到「走通了 7 步、
-第 5 步加购花了 4.2s」这种信息，而不是只看到一句断言失败。
-没有挂报告插件时 ``step()`` 是透明 no-op，脚本单独调用也不会受影响。
-"""
+分层：pages 描述单页能力，flows 编排跨页业务，tests 只做调用与断言。
+每个步骤包在 core.report.step() 里，报告能看到耗时分布；未挂插件时为 no-op。"""
 
 from __future__ import annotations
 
@@ -28,6 +20,9 @@ from pages.coin_page import CoinPage
 from pages.detail_page import DetailPage
 from pages.home_page import HomePage
 from pages.search_result_page import SearchResultPage
+
+
+logger = get_logger(__name__)
 
 
 class FlowError(RuntimeError):
@@ -143,7 +138,6 @@ class TaobaoFlow:
     def __init__(self, dev: AndroidDevice, package: str = TAOBAO_PACKAGE) -> None:
         self.dev = dev
         self.package = package
-        self.log = get_logger("flows.taobao")
 
     # ------------------------------------------------------------------ #
     # 前置纠偏
@@ -159,7 +153,7 @@ class TaobaoFlow:
             activity = self.dev.current_activity or ""
             if not any(hint in activity for hint in self.HEAVY_ACTIVITY_HINTS):
                 return escaped
-            self.log.warning("当前在重渲染页面（%s），元素查找会挂起，先按返回键退出", activity)
+            logger.warning("当前在重渲染页面（%s），元素查找会挂起，先按返回键退出", activity)
             self.dev.press("back")
             self.dev.wait_medium("返回后等页面切换")
             escaped = True
@@ -176,8 +170,8 @@ class TaobaoFlow:
                     self.dev.terminate_app(self.package)
                     self.dev.wait_medium("应用进程结束后等系统回收")
                 except WebDriverException:
-                    self.log.warning("结束应用失败（忽略）")
-            self.log.info("启动淘宝 %s", self.package)
+                    logger.warning("结束应用失败（忽略）")
+            logger.info("启动淘宝 %s", self.package)
             self.dev.launch_app(self.package)
 
             home = HomePage(self.dev)
@@ -192,7 +186,7 @@ class TaobaoFlow:
             try:
                 home.wait_ready(timeout=min(timeout, 20.0))
             except PageNotReadyError:
-                self.log.warning("未落在首页，点击底部「首页」tab 纠正")
+                logger.warning("未落在首页，点击底部「首页」tab 纠正")
                 home.tab.goto("home")
                 home.wait_ready(timeout=timeout)
 
@@ -230,9 +224,9 @@ class TaobaoFlow:
             title, price = page.product_at(index)
             snap = ProductSnapshot(title=title, price=price, from_card=bool(title))
             if snap.title:
-                self.log.info("商品快照(卡片): title=%r price=%r", snap.title[:24], snap.price)
+                logger.info("商品快照(卡片): title=%r price=%r", snap.title[:24], snap.price)
             else:
-                self.log.warning("结果卡片未解析出商品信息（desc 格式可能已变化）")
+                logger.warning("结果卡片未解析出商品信息（desc 格式可能已变化）")
         note(title=snap.short_title, price=snap.price)
         return snap
 
@@ -253,7 +247,7 @@ class TaobaoFlow:
             try:
                 cart = DetailPage(self.dev).open_cart()
             except PageNotReadyError:
-                self.log.warning("详情页内购物车入口不可用，改用底部 tab")
+                logger.warning("详情页内购物车入口不可用，改用底部 tab")
                 cart = HomePage(self.dev).open_cart()
         return cart
 
@@ -278,11 +272,11 @@ class TaobaoFlow:
         current = home.current_channel()
         if current == "推荐":
             return
-        self.log.info("当前频道=%r，先切到「推荐」（金币/领券位只在此频道投放）", current or "未知")
+        logger.info("当前频道=%r，先切到「推荐」（金币/领券位只在此频道投放）", current or "未知")
         try:
             home.select_channel("推荐")
         except PageNotReadyError as exc:
-            self.log.warning("切换到「推荐」频道失败，继续在当前频道探测: %s", exc)
+            logger.warning("切换到「推荐」频道失败，继续在当前频道探测: %s", exc)
 
     def probe_coin_entry(self) -> tuple[bool, str, Path | None]:
         """只探测金币入口是否投放，**不进页**（适合做 AB 投放监控）。
@@ -298,7 +292,7 @@ class TaobaoFlow:
             text = home.coin_entry_text() if found else ""
             shot = None if found else home.screenshot("no_coin_entry")
         if not found:
-            self.log.warning("金币入口未投放，截图=%s", shot)
+            logger.warning("金币入口未投放，截图=%s", shot)
         note(金币入口=text or "未投放")
         return found, text, shot
 
@@ -318,13 +312,11 @@ class TaobaoFlow:
 
         Args:
             do_first_task: 是否点第一个任务的「去完成」。
-            strict: 入口不存在时是否抛 ``FlowError``。
-                默认 False —— 金币入口是活动位，双 11/618 期间推荐页换皮肤后
-                入口会消失，这种情况应该如实返回 ``entry_found=False`` 让用例 skip，
-                而不是让整套回归变红。
+            strict: 入口不存在时是否抛 FlowError。默认 False —— 入口是活动位，双 11/618
+                换皮肤后会消失，此时应返回 entry_found=False 让用例 skip。
 
         Returns:
-            ``CoinFlowResult``：入口是否找到、是否进页、签到前后余额、截图留证。
+            CoinFlowResult：入口是否找到、是否进页、签到前后余额、截图留证。
         """
         result = CoinFlowResult()
 
@@ -343,7 +335,7 @@ class TaobaoFlow:
             result.home_screenshot = home.screenshot("no_coin_entry")
             if strict:
                 raise FlowError(f"{result.message} 现场截图={result.home_screenshot}")
-            self.log.warning("%s 现场截图=%s", result.message, result.home_screenshot)
+            logger.warning("%s 现场截图=%s", result.message, result.home_screenshot)
             note(金币入口="未投放")
             return result
 
@@ -357,21 +349,21 @@ class TaobaoFlow:
             result.task_names = snap_before.tasks
             result.content_readable = snap_before.readable
             if not snap_before.readable:
-                self.log.info("金币页无原生文案（渲染层页面），余额与任务列表不可读，以截图留证")
+                logger.info("金币页无原生文案（渲染层页面），余额与任务列表不可读，以截图留证")
 
         with step("签到领金币", screenshot_on_error=self.dev):
             result.signed = coin.sign_in()
             result.balance_after = coin.snapshot().balance
             if not result.signed:
-                self.log.info("未产生签到动作（已签到过或按钮未命中）")
+                logger.info("未产生签到动作（已签到过或按钮未命中）")
         coin.capture("center_after")
 
         if do_first_task:
             with step("执行首个金币任务", screenshot_on_error=self.dev):
                 if not coin.do_task(0):
-                    self.log.warning("首个任务按钮未命中，跳过")
+                    logger.warning("首个任务按钮未命中，跳过")
 
-        self.log.info(
+        logger.info(
             "金币链路: entry=%r reached=%s readable=%s signed=%s balance=%s->%s tasks=%d",
             result.entry_text,
             result.page_reached,
@@ -410,7 +402,7 @@ class TaobaoFlow:
         result.cart_item_count = cart.item_count_by_ocr()
         result.cart_total = cart.total_price_by_ocr()
 
-        self.log.info(
+        logger.info(
             "链路结果: keyword=%r count=%d title=%r price=%r badge=%d->%d add_ok=%s cart=%s",
             keyword,
             result.result_count,

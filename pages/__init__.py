@@ -1,13 +1,7 @@
 """页面对象层。
 
-约定
-----
-- ``pages/base_page.py``    —— 页面基类（多候选选择器轮询、显式等待、滚动、留证）
-- ``pages/components/``     —— 可复用组件（浮层清理、底部导航、搜索栏），跨页面复用
-- ``pages/*_page.py``       —— 具体页面对象，只描述「这个页面有什么、能做什么」
-
-页面方法返回下一个页面对象，方便链式编排；具体断言放在 flows / tests 层。
-"""
+base_page.py 提供基类，components/ 放跨页复用组件，*_page.py 是具体页面；
+页面方法返回下一个页面对象，断言留给 flows / tests。"""
 
 from __future__ import annotations
 

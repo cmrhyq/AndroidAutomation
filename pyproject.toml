@@ -56,12 +56,15 @@ dependencies = [
 # 可选依赖分组（pip install -e ".[dev,test]"）
 # ----------------------------------------------------------------------------
 [project.optional-dependencies]
-# 开发工具：lint、类型检查、git hooks
+# 开发工具：lint、类型检查、测试运行器与插件
 dev = [
     "ruff>=0.4.0",                 # 代码检查 & 格式化
     "mypy>=1.10.0",                # 静态类型检查
     "pre-commit>=3.7.0",           # Git 提交前钩子（需 .pre-commit-config.yaml 才生效）
     "detect-secrets>=1.5",         # 密钥泄漏扫描（需 .secrets.baseline 才生效）
+    "pytest>=8.0",                 # 测试运行器
+    "pytest-order>=1.2",           # @pytest.mark.order 用例排序
+    "allure-pytest>=2.13",         # Allure 报告
 ]
 # 测试工具
 test = [

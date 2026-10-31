@@ -1,27 +1,7 @@
 """淘宝购物车页面对象。
 
-⚠️ 重要技术限制：购物车整页是 Weex 渲染
---------------------------------------
-真机实测（PFGM00 / 淘宝 10.x）：购物车页无论空车还是有一车商品，
-UI 层级里都**只有 22 个原生节点** —— 除了底部导航栏和框架容器，
-一个商品都没有::
-
-    icart_weex_root_view    FrameLayout   ← 整个购物车内容都在这里面
-    tabhost / tabs / 底部 5 个 tab
-
-也就是说，``text~=合计``、``text~=全选``、商品标题、金额，**全部读不到**。
-这不是选择器没写对，是 Weex 不向 uiautomator 暴露节点。
-
-因此本页面对象采取的策略是：
-
-1. **页面到达校验**用原生 ``icart_weex_root_view``（可靠）。
-2. **内容校验**不假装能做，提供两种真实可行手段：
-   - :meth:`capture` 截图存档，报告里直接看图，人工/OCR 复核；
-   - :meth:`item_count_by_ocr` 若本机装了 pytesseract 就自动 OCR 数字，
-     没装则返回 ``-1`` 表示「不可用」，绝不返回假的 0。
-3. **加购是否成功**不要依赖本页判断 —— 请用
-   :meth:`pages.detail_page.DetailPage.add_to_cart` 的角标判据，那是原生可读的。
-"""
+购物车整页为 Weex 渲染，只能读到 icart_weex_root_view 等框架节点，商品与金额读不到；
+因此只做页面到达校验与截图留证，内容断言不在本页做。"""
 
 from __future__ import annotations
 
@@ -29,7 +9,11 @@ import re
 import shutil
 from pathlib import Path
 
+from core import get_logger
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 
 class CartPage(BasePage):
@@ -61,7 +45,7 @@ class CartPage(BasePage):
     def capture(self, tag: str = "cart") -> Path:
         """截图留证 —— Weex 内容读不到时，这是最实在的证据。"""
         path = self.screenshot(tag)
-        self.log.info("购物车截图已存档: %s", path)
+        logger.info("购物车截图已存档: %s", path)
         return path
 
     # ------------------------------------------------------------------ #
@@ -92,7 +76,7 @@ class CartPage(BasePage):
             with Image.open(shot) as img:
                 return pytesseract.image_to_string(img, lang="chi_sim+eng")
         except Exception as exc:  # OCR 失败不应影响用例结论
-            self.log.warning("OCR 识别失败: %s", exc)
+            logger.warning("OCR 识别失败: %s", exc)
             return ""
 
     def item_count_by_ocr(self) -> int:

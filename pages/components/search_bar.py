@@ -1,15 +1,14 @@
 """搜索栏组件：首页搜索入口 + 关键词提交。
 
-两段式交互（先点入口进搜索页，再输入关键词），两个阶段的选择器都会因版本变化，
-所以每一步都给多个候选。
-
-实测（PFGM00 / 淘宝 10.x）：首页搜索入口与右侧橙色「搜索」按钮都用 content-desc，
-**不要**用 `text=推荐` 之类的顶部 tab 文案做兜底 —— 那会点进推荐流而不是搜索页。
-"""
+首页入口与提交按钮都用 content-desc，不要用顶部 tab 文案兜底（会点进推荐流）。"""
 
 from __future__ import annotations
 
+from core.logger import get_logger
 from pages.base_page import BasePage
+
+
+logger = get_logger(__name__)
 
 
 class SearchBar(BasePage):
@@ -57,7 +56,7 @@ class SearchBar(BasePage):
         if self.exists_any(*self.SUBMIT_SELECTORS, timeout=3.0):
             self.tap_center(*self.SUBMIT_SELECTORS, timeout=3.0)
         else:
-            self.log.info("未找到搜索按钮，改用键盘回车提交")
+            logger.info("未找到搜索按钮，改用键盘回车提交")
             self.dev.press("enter")
         self.dev.wait_medium("等搜索结果页加载")
 

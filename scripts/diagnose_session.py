@@ -1,17 +1,8 @@
 """会话健康诊断：逐项探测关键端点，定位「会话能建但命令全 404」这类问题。
 
-用法:
-    python scripts/diagnose_session.py
-    python scripts/diagnose_session.py --udid emulator-5554 --port 8300
+用法：python scripts/diagnose_session.py [--udid emulator-5554] [--port 8300]
 
-判读要点：
-- page_source / screenshot 通过、其余大量 404
-  → 设备上跑着**旧版** uiautomator2 server（常见于模拟器快照回滚、或 8200 端口
-    被僵尸进程占用）。处理：adb uninstall io.appiums.uiautomator2.server
-    io.appiums.uiautomator2.server.test io.appiums.settings 后重试，或换 --port。
-- FindElementModel: mandatory field 'selector'
-  → 客户端与设备端 server 不是同一代，整套升级或整套降级。
-"""
+若 page_source / screenshot 正常而其余命令大量 404，多半是设备残留旧版 uiautomator2 server。"""
 
 from __future__ import annotations
 

@@ -1,33 +1,6 @@
-"""Allure 辅助工具类：把常见附件形态收敛成 ``AllureHelper.xxx()`` 的写法。
+"""Allure 附件工具类 AllureHelper。
 
-为什么还要包一层
-----------------
-**实现全部落在** :mod:`core.report.collector` **，这里只做签名适配，不重复实现**：
-
-============ ==========================================
-本类方法      实际调用
-============ ==========================================
-attach_screenshot :func:`collector.attach_image`（设备对象直接交给它截图）
-attach_text   :func:`collector.attach_text`
-attach_log    :func:`collector.attach_text`
-attach_json   :func:`collector.attach_json`
-attach_html   :func:`collector.attach_html`
-attach_file   :func:`collector.attach_file`
-attach_table  :func:`collector.attach_table`
-step          :func:`collector.step`（失败自动补截图、未启用时 no-op）
-============ ==========================================
-
-这样「没挂 pytest 插件时全部退化成 no-op」「附件失败不影响用例结论」
-「截图走 ``AndroidDevice.screenshot``」这些语义自动继承，不会出现两套逻辑分叉。
-
-什么时候用它
-------------
-- 外部接入的用例习惯 ``AllureHelper.attach_screenshot(dev)`` 这种静态调用；
-- 需要在断言失败后立刻补一张图、贴一段日志或一段 JSON。
-
-框架内部（``flows`` / ``pages``）仍推荐直接用 ``from core.report import step, note``，
-少一层包装更好读。
-"""
+底层全部委托 core.report.collector，此处只做签名适配，不重复实现。"""
 
 from __future__ import annotations
 
@@ -36,19 +9,15 @@ from typing import Any, Iterator
 
 import allure
 
+from core import get_logger
 from core.report import collector
 
 #: 合法的严重度取值（Allure 只认这五档，写错会被前端忽略且不报错）
 _SEVERITIES = frozenset({"blocker", "critical", "normal", "minor", "trivial"})
 
 
-def _warn(message: str) -> None:
-    try:
-        from core.logger import get_logger
+logger = get_logger(__name__)
 
-        get_logger(__name__).warning(message)
-    except Exception:  # noqa: BLE001
-        pass
 
 
 def _dynamic(name: str, *args: Any, **kwargs: Any) -> bool:
@@ -57,7 +26,7 @@ def _dynamic(name: str, *args: Any, **kwargs: Any) -> bool:
         getattr(allure.dynamic, name)(*args, **kwargs)
         return True
     except Exception as exc:  # noqa: BLE001 - 元信息挂不上不该让用例失败
-        _warn(f"allure.dynamic.{name} 调用失败：{exc}")
+        logger.warning(f"allure.dynamic.{name} 调用失败：{exc}")
         return False
 
 
@@ -73,18 +42,12 @@ class AllureHelper:
     # ------------------------------------------------------------------ #
     @staticmethod
     def attach_screenshot(screenshot: object, name: str = "截图") -> bool:
-        """挂一张截图。``screenshot`` 支持三种形态（都走框架既有能力）：
+        """挂一张截图。
 
-        - ``AndroidDevice``：内部调 ``dev.screenshot(tag)`` 落盘后再挂，
-          这就是 ``flows`` / ``pages`` 平时留证用的同一个方法；
-        - ``str`` / ``Path``：已有的图片文件，不存在时静默跳过；
-        - ``bytes``：PNG 字节流（例如 ``driver.get_screenshot_as_png()``），直接挂不落盘。
-
-        示例::
+        screenshot 支持三种形态：AndroidDevice（内部调 dev.screenshot 落盘后再挂）、
+        str/Path（已有图片文件，不存在则跳过）、bytes（PNG 字节流，直接挂不落盘）。
 
             AllureHelper.attach_screenshot(dev, "金币中心现场")
-            AllureHelper.attach_screenshot(dev.screenshot("登录页"), "登录页")
-            AllureHelper.attach_screenshot(page.screenshot_png(), "失败现场")
         """
         return collector.attach_image(screenshot, name=name)
 
@@ -180,7 +143,7 @@ class AllureHelper:
         level = getattr(severity, "value", severity)
         text = str(level).strip().lower()
         if text not in _SEVERITIES:
-            _warn(f"非法严重度 {severity!r}，可选：{sorted(_SEVERITIES)}")
+            logger.warning(f"非法严重度 {severity!r}，可选：{sorted(_SEVERITIES)}")
             return False
         return _dynamic("severity", text)
 

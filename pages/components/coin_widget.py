@@ -1,28 +1,22 @@
 """推荐页「领淘金币」挂件组件。
 
-为什么单独做成组件而不是塞进 ``HomePage``
-------------------------------------------
-1. 它是**活动位**，双 11 / 618 期间推荐页会整块换皮肤，入口可能不存在。
-   独立组件才能把「不存在」当成正常分支处理，而不是污染首页主流程。
-2. 同款挂件在「我的淘宝」等页面也会出现，做成组件后可复用。
-
-定位要点（真机实测）
---------------------
-``content-desc="领淘金币"`` 在层级里出现 3 次（外层容器 / 可点层 / 内部文案层），
-没有 ``resource-id``。直接 ``desc=领淘金币`` 大概率命中不可点击的外层，
-所以点击一律走 ``tap_center``（按命中元素中心坐标点），不依赖 ``clickable`` 属性。
-"""
+活动位，双 11 / 618 会整块换皮肤，入口可能不存在，需当正常分支处理。
+desc=领淘金币 在层级里重复出现且无 resource-id，点击统一走 tap_center。"""
 
 from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
 
+from core.logger import get_logger
 from data.constant.taobao import COIN_ENTRY_DESCS
 from pages.base_page import BasePage, PageNotReadyError
 
 if TYPE_CHECKING:
     from pages.coin_page import CoinPage
+
+
+logger = get_logger(__name__)
 
 
 class CoinWidget(BasePage):
@@ -95,6 +89,6 @@ class CoinWidget(BasePage):
                 f"当前可能未投放。已尝试: {list(self.ENTRY_SELECTORS)}（activity={self.activity}）"
             ) from exc
 
-        self.log.info("点击金币入口: %s", selector)
+        logger.info("点击金币入口: %s", selector)
         self.tap_center(selector, timeout=timeout)
         return CoinPage(self.dev)

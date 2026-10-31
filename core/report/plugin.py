@@ -1,25 +1,7 @@
-"""Allure 报告插件：会话前后自动产出 Allure 结果与 HTML 报告。
+"""Allure 报告 pytest 插件：运行结束后产出 allure-results 与 HTML 报告。
 
-用法
-----
-    pytest                              # 跑完自动生成 allure 报告
-    pytest --allure-open                # 生成后直接开浏览器
-    pytest --allure-single-file         # 单文件报告（方便发给别人）
-    pytest --no-allure                  # 完全关掉，零开销
-    pytest --no-allure-generate         # 只出 allure-results，HTML 留给 CI 生成
-
-报告内容怎么来的
-----------------
-- **层级**：epic（项目）→ feature（测试文件）→ story（用例标题），左侧按功能树浏览
-- **步骤**：业务流里的 ``with step("..."):`` 自动成为可折叠步骤，失败步骤单独标红
-- **截图**：步骤失败自动拍（``screenshot_on_error``），用例失败再补一张全屏
-- **业务上下文**：``note(keyword="蓝牙耳机")`` 汇总成一张表贴在用例详情里
-- **分类**：``categories.json`` 把失败归成「设备/会话异常」「选择器失效」「断言不符」
-- **环境**：设备型号 / 序列号 / Android 版本 / 应用版本 / Appium 版本写进 environment.properties
-
-挂载方式见根目录 ``conftest.py`` 的 ``pytest_plugins``
-（pytest 7+ 不允许在子目录 conftest 里写这项）。
-"""
+常用参数：--allure-open（生成后打开）、--allure-single-file（单文件）、--no-allure（关闭）。
+挂载点在根目录 conftest.py 的 pytest_plugins（pytest 7+ 不允许写在子目录 conftest）。"""
 
 from __future__ import annotations
 
@@ -129,15 +111,11 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(session: pytest.Session, config: pytest.Config, items: list) -> None:
-    """在收集阶段就把中文标题、功能树、严重度挂到用例上。
+    """在收集阶段把中文标题、功能树、严重度挂到用例上。
 
-    为什么不用 ``allure.dynamic.title``
-    -----------------------------------
-    allure-pytest 的 ``pytest_runtest_setup`` 是 **hookwrapper**，它在 ``yield``
-    之后才写 ``test_result.name = allure_name(item, ...)`` —— 那是所有普通 hook
-    都跑完之后。所以在 setup 里调 ``dynamic.title`` 一定会被覆盖，报告里永远是
-    ``test_xxx``。官方机制是读函数上的 ``__allure_display_name__``（``@allure.title``
-    就是设这个属性），因此这里在收集阶段直接注入属性与 label marker。
+    不能用 allure.dynamic.title：allure-pytest 的 pytest_runtest_setup 是 hookwrapper，
+    yield 之后才写 test_result.name，setup 里设置必被覆盖。官方机制是读函数上的
+    __allure_display_name__（@allure.title 就是设这个属性），故在收集阶段注入。
     """
     if config.getoption("--no-allure") or not config.option.allure_report_dir:
         return

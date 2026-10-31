@@ -1,32 +1,7 @@
-"""淘宝 App 端到端用例：启动 → 搜索 → 详情 → 加购 → 购物车。
+"""淘宝端到端用例：启动 → 搜索 → 详情 → 加购 → 购物车。
 
-前置条件
---------
-1. 设备已连接并开启调试（``adb devices`` 能看到 ``device``）
-2. 设备已安装淘宝（``com.taobao.taobao``）
-3. Appium 已就绪，或 ``AUTO_START_APPIUM=true`` 由框架自动拉起
-
-无设备 / Appium 不可用时由 conftest 整体 skip，不会 fail。
-
-运行
-----
-    .venv/Scripts/python.exe -m pytest tests/test_taobao.py -v
-    .venv/Scripts/python.exe -m pytest tests/test_taobao.py -v -k cart     # 只跑加购链路
-    TAOBAO_KEYWORD=机械键盘 .venv/Scripts/python.exe -m pytest tests/
-
-跑完会自动生成 Allure 报告：``artifacts/allure-report/index.html``
-（用 ``allure open artifacts/allure-report`` 或 ``pytest --allure-open`` 查看）
-
-选择器校准
-----------
-淘宝选择器随版本变化。断言失败时看报告里的「现场截图」，或导出层级对照::
-
-    .venv/Scripts/python.exe scripts/ui_dump.py
-    # 产物在 artifacts/pages/*.xml
-
-⚠️ 详情页与购物车页是 Weex 渲染，``page_source`` 里没有业务节点，
-dump 它们没有意义（详见 ``pages/detail_page.py`` / ``pages/cart_page.py`` 的说明）。
-"""
+需要设备在线并已安装淘宝，无设备时由 conftest 整体 skip。
+选择器失效时先用 scripts/ui_dump.py 导层级对照。"""
 
 from __future__ import annotations
 
