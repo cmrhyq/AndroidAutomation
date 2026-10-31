@@ -260,19 +260,20 @@ pytest --no-allure                  # 彻底关闭（零开销）
 
 | 区块 | 说明 |
 | --- | --- |
-| 标题与功能树 | 用例 docstring 首行做中文标题；`epic → feature（测试文件）→ story（用例）` 三级树 |
+| 标题与功能树 | `@allure.title` 优先，没写则取用例 docstring 首行；`epic → feature（测试文件）→ story（用例）` 三级树 |
 | 执行步骤 | 业务流的 `with step("...")` 自动成为可折叠步骤，带耗时与失败定位 |
 | 截图 | 步骤失败自动拍（`screenshot_on_error`）+ 用例失败补一张全屏，直接挂在步骤下 |
 | 业务上下文 | `note(keyword="蓝牙耳机")` 汇总成一张对齐的文本表，贴在用例详情 |
 | 失败分类 | `core/report/categories.json`：设备/会话异常、选择器失效、业务断言不符 |
 | 环境信息 | 设备型号、序列号、Android 版本、分辨率、包名、应用版本、Appium 版本 |
 | 趋势图 | 每次生成后把 `history/` 存回 results，下次运行 TREND 就有曲线 |
-| 严重度 | `device` → critical、`smoke` → blocker、`unit`/`slow` → minor |
+| 严重度 | 优先 `@allure.severity`，否则按 marker 推：`device` → critical、`smoke` → blocker、`unit`/`slow` → minor |
 
 **为什么标题不走 `allure.dynamic.title`**：allure-pytest 的 `pytest_runtest_setup`
 是 hookwrapper，`yield` **之后**才写 `test_result.name`，在 setup 里设置标题一定会被
 覆盖，报告里永远是 `test_xxx`。所以插件改在 `pytest_collection_modifyitems` 阶段注入
 `__allure_display_name__` 与 `allure_label` marker —— 也就是 `@allure.title` 的底层机制。
+用例里显式写的 `@allure.title / story / severity / description` **优先**，插件只做兜底。
 
 **环境信息两级采集**：建好会话后从 driver capabilities 取（最准）；会话没起来时用
 `adb` + Appium `/status` 兜底。运行期优先、静态补空，所以「一条都没跑起来」的报告也不空白。
@@ -289,7 +290,24 @@ note(keyword="蓝牙耳机", 商品数=str(page.result_count()))
 
 `step` / `note` 在没有 pytest 时是透明 no-op，脚本里单独跑不会报错。
 
-报告模块自身有 12 条离线用例（`tests/test_allure_offline.py`，`unit` 标记），
+**挂附件**：截图 / JSON / HTML / 文件都走 `core/report`，两种写法等价（后者只是签名适配层）：
+
+```python
+from core.report import attach_image, attach_json, attach_table
+from core.report import AllureHelper
+
+attach_image(dev, "金币中心现场")                  # 传设备对象：内部调 dev.screenshot(tag)
+AllureHelper.attach_screenshot(dev, "首页")        # 同上，类式写法
+AllureHelper.attach_json({"角标": "0 → 1"})        # dict → 缩进 JSON（中文不转义）
+AllureHelper.attach_html("<h2>摘要</h2>")          # Allure 里可切换 HTML 视图
+AllureHelper.attach_file("artifacts/logs/androidauto.log")   # 类型按后缀推断
+AllureHelper.add_severity("critical")              # 非法取值会告警并返回 False
+```
+
+`attach_*` 一律返回 `bool`（是否真的挂上）：报告链路坏掉时在 CI 里是静默的，
+留个可断言返回值，离线用例才守得住。截图缺失（instrumentation 崩过）按可容忍损耗静默跳过。
+
+报告模块自身有 19 条离线用例（`tests/test_allure_offline.py`，`unit` 标记），
 不依赖设备，改埋点或分类规则后可秒级验证：
 
 ```bash
