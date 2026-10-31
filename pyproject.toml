@@ -43,11 +43,13 @@ classifiers = [
 
 # ----------------------------------------------------------------------------
 # 运行时依赖（pip install android-automation 时自动安装）
-# 注：除标准库外只有 Appium 客户端一个外部依赖 ——
+# 注：除标准库外只有两个外部依赖 —— Appium 客户端与 Allure 报告适配；
 #     config.py 自己解析 .env（不引入 python-dotenv）、日志用 stdlib logging。
+#     Allure 的 HTML 由官方命令行生成，见 README「测试报告」一节。
 # ----------------------------------------------------------------------------
 dependencies = [
     "Appium-Python-Client>=6.0.8,<7",
+    "allure-pytest>=2.13,<3",
 ]
 
 # ----------------------------------------------------------------------------
@@ -131,7 +133,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["androidauto", "flows", "pages"]  # 项目自身模块，排序归入第一方
+known-first-party = ["core", "flows", "pages"]  # 项目自身模块，排序归入第一方
 
 # ----------------------------------------------------------------------------
 # mypy 配置（静态类型检查）
@@ -146,7 +148,7 @@ no_implicit_optional = true
 exclude = ["artifacts/", "tools/", "\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["appium.*", "selenium.*"]  # 第三方库无类型桩
+module = ["appium.*", "selenium.*", "allure.*"]  # 第三方库无类型桩
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------

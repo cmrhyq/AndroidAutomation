@@ -14,7 +14,8 @@
     .venv/Scripts/python.exe -m pytest tests/test_taobao.py -v -k cart     # 只跑加购链路
     TAOBAO_KEYWORD=机械键盘 .venv/Scripts/python.exe -m pytest tests/
 
-跑完会自动生成报告：``artifacts/reports/report_<时间戳>.html``
+跑完会自动生成 Allure 报告：``artifacts/allure-report/index.html``
+（用 ``allure open artifacts/allure-report`` 或 ``pytest --allure-open`` 查看）
 
 选择器校准
 ----------

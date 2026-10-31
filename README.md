@@ -227,41 +227,55 @@ dev = AndroidDevice(create_driver(cfg), cfg)
 
 无设备时设备相关用例会自动 **skip**（不报错），适合本地快速验证逻辑改动。
 
-### 6.1 测试报告（默认开启）
+### 6.1 测试报告（Allure，默认开启）
 
-跑完 pytest 自动生成单文件报告，双击即可在浏览器打开：
+跑完 pytest 自动调用 allure 命令行生成报告：
 
 ```
-artifacts/reports/report_20261029_003000.html   # 自包含，截图已 base64 内嵌
-artifacts/reports/report_20261029_003000.json   # 同数据，供 CI 消费（schema=2）
-artifacts/reports/index.html                    # 运行历史索引，每次运行自动刷新
+artifacts/allure-results/     # 原始结果（json + 截图附件），CI 里可直接喂给 allure
+artifacts/allure-report/      # HTML 报告：总览 / 分类 / 功能树 / 趋势
+  └─ index.html
 ```
+
+> ⚠️ **目录报告别双击 `index.html`**：Allure 前端用 XHR 读 `data/*.json`，
+> `file://` 下会被浏览器当跨域拦掉，页面永远停在 "Loading..."。用下面任一方式打开：
+>
+> ```bash
+> allure open artifacts/allure-report    # 推荐：自动起本地服务 + 开浏览器
+> pytest --allure-open                   # 跑完直接打开
+> ```
 
 ```bash
-pytest --report-dir=out          # 换输出目录
-pytest --report-title="夜间回归"  # 换标题
-pytest --report-open             # 跑完自动用浏览器打开
-pytest --report-keep=5           # 只保留最近 5 份（默认 20，0 = 不清理）
-pytest --no-report               # 彻底关闭（零开销）
+pytest                              # 默认生成报告
+pytest --allure-open                # 跑完自动打开
+pytest --allure-single-file         # 单文件报告，双击即开、可直接发给别人
+pytest --allure-results=out/results # 换结果目录
+pytest --allure-report=out/report   # 换 HTML 目录
+pytest --no-allure-generate         # 只出 results，HTML 交给 CI 生成
+pytest --allure-keep-results        # 保留上次 results（默认清空，防历史混入）
+pytest --no-allure                  # 彻底关闭（零开销）
 ```
 
 报告内容：
 
 | 区块 | 说明 |
 | --- | --- |
-| 顶部结论 | 全部通过 / N 个失败 + 通过率、总耗时、命令行、pytest 退出码 |
-| 统计卡 | 总数、通过、失败（含 error）、跳过、通过率、总耗时 |
-| 失败概览 | 同一异常类型合并计数，一眼分辨「选择器失效」还是「环境故障」 |
-| 运行环境 | 设备型号、序列号、Android 版本、分辨率、包名、应用版本、Appium 版本（两级采集，见下） |
-| 运行参数 | pytest 版本、退出码、`AA_WAIT_SCALE`、搜索词等；附 marker 维度统计 |
-| 用例明细 | **按测试文件分组**，含失败的组自动展开；组标题显示组内通过率条 |
-| 执行步骤 | 嵌套步骤缩进展示，失败步骤红标 + 异常信息 + **该步骤自己的截图** |
-| 失败详情 | 异常类型 + 消息 + 自动标出「失败步骤」+ 可复制 traceback |
-| 最慢用例 | Top 5 耗时排行，定位拖慢回归的用例 |
-| 历史索引 | `index.html` 列出历次运行（时间、通过率条、失败数），点击跳转 |
+| 标题与功能树 | 用例 docstring 首行做中文标题；`epic → feature（测试文件）→ story（用例）` 三级树 |
+| 执行步骤 | 业务流的 `with step("...")` 自动成为可折叠步骤，带耗时与失败定位 |
+| 截图 | 步骤失败自动拍（`screenshot_on_error`）+ 用例失败补一张全屏，直接挂在步骤下 |
+| 业务上下文 | `note(keyword="蓝牙耳机")` 汇总成一张对齐的文本表，贴在用例详情 |
+| 失败分类 | `core/report/categories.json`：设备/会话异常、选择器失效、业务断言不符 |
+| 环境信息 | 设备型号、序列号、Android 版本、分辨率、包名、应用版本、Appium 版本 |
+| 趋势图 | 每次生成后把 `history/` 存回 results，下次运行 TREND 就有曲线 |
+| 严重度 | `device` → critical、`smoke` → blocker、`unit`/`slow` → minor |
 
-**环境信息的两级采集**：先建会话后从 driver capabilities 取（最准），会话没起来时用
-`adb` + Appium `/status` 兜底；运行期优先、静态补空，所以「一条都没跑起来」的报告也不会是空白。
+**为什么标题不走 `allure.dynamic.title`**：allure-pytest 的 `pytest_runtest_setup`
+是 hookwrapper，`yield` **之后**才写 `test_result.name`，在 setup 里设置标题一定会被
+覆盖，报告里永远是 `test_xxx`。所以插件改在 `pytest_collection_modifyitems` 阶段注入
+`__allure_display_name__` 与 `allure_label` marker —— 也就是 `@allure.title` 的底层机制。
+
+**环境信息两级采集**：建好会话后从 driver capabilities 取（最准）；会话没起来时用
+`adb` + Appium `/status` 兜底。运行期优先、静态补空，所以「一条都没跑起来」的报告也不空白。
 
 **给业务流加步骤埋点**（可选，不加也能出报告）：
 
@@ -273,13 +287,13 @@ with step("搜索关键词"):
 note(keyword="蓝牙耳机", 商品数=str(page.result_count()))
 ```
 
-`step` 在没有 pytest 时是透明 no-op，脚本里单独跑不会报错。
+`step` / `note` 在没有 pytest 时是透明 no-op，脚本里单独跑不会报错。
 
-报告模块自身有 13 条离线用例（`tests/test_report_offline.py`，`unit` 标记），
-不依赖设备，改样式或加字段后可秒级验证：
+报告模块自身有 12 条离线用例（`tests/test_allure_offline.py`，`unit` 标记），
+不依赖设备，改埋点或分类规则后可秒级验证：
 
 ```bash
-.venv/Scripts/python.exe -m pytest tests/test_report_offline.py -q
+.venv/Scripts/python.exe -m pytest tests/test_allure_offline.py -q
 ```
 
 ### 6.2 淘宝渲染分层（写用例前必读）
@@ -322,7 +336,9 @@ note(keyword="蓝牙耳机", 商品数=str(page.result_count()))
 
 | 类型 | 路径 |
 | --- | --- |
-| 测试报告 | `artifacts/reports/report_<时间戳>.html` / `.json` |
+| Allure 原始结果 | `artifacts/allure-results/`（含 `environment.properties`、`categories.json`、截图附件） |
+| Allure HTML 报告 | `artifacts/allure-report/index.html`（用 `allure open` 打开） |
+| Allure 单文件报告 | `artifacts/reports/allure_<时间戳>.html`（仅 `--allure-single-file`） |
 | 截图 | `artifacts/screenshots/` |
 | UI 层级 XML | `artifacts/pages/` |
 | 日志 | `artifacts/logs/androidauto.log`、`appium-server.log` |

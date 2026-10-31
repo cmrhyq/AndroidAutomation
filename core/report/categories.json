@@ -1,0 +1,17 @@
+[
+  {
+    "name": "设备 / 会话异常（非用例问题）",
+    "matchedStatuses": ["broken", "failed"],
+    "messageRegex": "(?s).*(instrumentation process is not running|device offline|DeviceNotFound|Appium Server|appium server|session is either terminated|Could not find a connected Android|ECONNREFUSED|WebDriverException).*"
+  },
+  {
+    "name": "选择器失效 / 页面改版",
+    "matchedStatuses": ["failed", "broken"],
+    "messageRegex": "(?s).*(NoSuchElement|StaleElement|未识别到商品卡片|未找到|未出现|未投放|未解析出|选择器).*"
+  },
+  {
+    "name": "业务断言不符预期",
+    "matchedStatuses": ["failed"],
+    "messageRegex": "(?s).*(AssertionError|角标|期望).*"
+  }
+]
