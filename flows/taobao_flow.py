@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from core.android.actions import AndroidDevice
 from core.logger import get_logger
 from core.report import note, step
 from data.constant.taobao import DEFAULT_KEYWORD, TAOBAO_PACKAGE
+from data.entity.taobao import TaskRow
 from pages.base_page import PageNotReadyError
 from pages.cart_page import CartPage
 from pages.coin_page import CoinPage
@@ -116,6 +118,30 @@ class CoinFlowResult:
     @property
     def balance_readable(self) -> bool:
         return self.balance_before >= 0 or self.balance_after >= 0
+
+
+@dataclass
+class CoinTaskResult:
+    """金币任务巡检 / 执行结果。"""
+
+    #: 金币页是否有原生可读文案（False = themis 渲染层或入口未投放）
+    readable: bool = False
+    #: 任务列表读到的任务名
+    tasks: list[str] = field(default_factory=list)
+    #: 行内已显示「已完成 / 已领取」的任务名
+    done: list[str] = field(default_factory=list)
+    #: 任务名关键词 → 实际点击成功次数
+    completed: dict[str, int] = field(default_factory=dict)
+    #: 没跑成的关键词及原因
+    failures: list[str] = field(default_factory=list)
+    #: 任务列表现场截图（渲染层页面只能靠它留证）
+    screenshot: Path | None = None
+    #: 跳过 / 降级说明
+    message: str = ""
+
+    @property
+    def total_completed(self) -> int:
+        return sum(self.completed.values())
 
 
 class TaobaoFlow:
@@ -379,6 +405,143 @@ class TaobaoFlow:
             签到=str(result.signed),
             余额=f"{result.balance_before} → {result.balance_after}",
         )
+        return result
+
+    # ------------------------------------------------------------------ #
+    # 金币任务
+    # ------------------------------------------------------------------ #
+    def _enter_coin_center(self) -> CoinPage | None:
+        """回到首页 → 推荐页 → 金币中心；入口未投放时返回 None（活动位，不算失败）。
+
+        必须先走 ``start()``：上一个用例可能正停在金币小镇（TMSActivity），
+        这种 themis 容器页上直接找首页搜索栏只会 15s 超时 —— 就是这个坑让
+        ``test_check_task`` 在 ``home.wait_ready()`` 上挂掉过。
+        """
+        home = self.start(fresh=False)
+        self._ensure_recommend_channel(home)
+        if not home.has_coin_entry(timeout=3.0):
+            logger.warning("推荐页未投放「领淘金币」入口，无法进入金币中心")
+            return None
+        coin = home.open_coin_center()
+        coin.wait_ready_soft(timeout=12.0)
+        return coin
+
+    def _mark_unreadable(self, coin: CoinPage, result: CoinTaskResult) -> None:
+        """任务列表读不到时留证并写降级说明（返回 skip 用）。"""
+        # themis 容器刚进入时是白屏，H5 首屏要几秒才画出来；不等就会截到一张全白图
+        self.dev.wait_long("等金币页首屏渲染")
+        result.screenshot = coin.capture("task_list")
+        result.message = (
+            f"任务列表读不到原生节点（activity={coin.activity}）："
+            "「做任务赚能量」面板是 H5，NATIVE_APP 下只暴露一个 desc=淘金币首页 的 WebView 容器，"
+            "任务名与「去完成」按钮都不在原生层（contexts 里也没有 WEBVIEW 上下文）。"
+            f"现场截图={result.screenshot}"
+        )
+        logger.warning(result.message)
+
+    def _read_task_list(self, coin: CoinPage, result: CoinTaskResult) -> list[TaskRow]:
+        """打开任务列表并读出任务行；空列表表示这个版本读不到。"""
+        with step("打开任务列表并读取任务行", screenshot_on_error=self.dev):
+            coin.open_task_center()
+            rows = coin.task_rows()
+
+        if not rows:
+            self._mark_unreadable(coin, result)
+            note(任务列表="未读到任务行")
+            return []
+
+        result.readable = True
+        result.screenshot = coin.capture("task_list")
+        result.tasks = [row.name for row in rows]
+        result.done = [row.name for row in rows if row.done or row.remaining == 0]
+        logger.info("任务列表: 共 %d 条，已完成 %d 条", len(result.tasks), len(result.done))
+        note(任务数=len(result.tasks), 已完成=len(result.done))
+        return rows
+
+    def inspect_coin_tasks(self) -> CoinTaskResult:
+        """进金币中心 → 任务列表，读出任务名、进度与完成态（只读，不点任务）。"""
+        result = CoinTaskResult()
+        with step("回到首页并进入金币中心", screenshot_on_error=self.dev):
+            coin = self._enter_coin_center()
+        if coin is None:
+            result.message = "推荐页未投放「领淘金币」入口，无法进入金币中心"
+            return result
+
+        self._read_task_list(coin, result)
+        return result
+
+    def _dwell_and_return(self, coin: CoinPage, dwell: float) -> None:
+        """在任务跳转页停留 dwell 秒，再退回金币中心并重新打开任务列表。
+
+        浏览 / 搜索 / 视频类任务按停留时长计数，点完立刻返回会被判「未完成」。
+        """
+        deadline = time.monotonic() + max(dwell, 0.0)
+        while time.monotonic() < deadline:
+            self.dev.wait_short("任务页停留中")
+
+        if not coin.back_to_coin_center():
+            logger.warning("任务页返回失败（activity=%s），后续任务可能全部落空", self.dev.current_activity)
+            return
+        # 返回后多半已回到任务列表；探测一下按钮，没按钮才认为退到了金币首页，再点入口进去
+        if not coin.probe(*coin.TASK_ACTION_SELECTORS):
+            coin.open_task_center()
+
+    def _remaining_of(self, rows: list[TaskRow], keyword: str) -> int:
+        """从任务行的进度后缀取还剩几次；页面上没写进度就按 1 次处理。"""
+        for row in rows:
+            if row.matches(keyword):
+                remaining = row.remaining
+                if remaining is not None:
+                    return remaining
+                return 0 if row.done else 1
+        return 0
+
+    def _run_one_coin_task(self, coin: CoinPage, keyword: str, dwell: float) -> bool:
+        """点一次指定任务并退回，成功点击返回 True。"""
+        with step(f"执行金币任务「{keyword}」", screenshot_on_error=self.dev):
+            row = coin.do_task_by_name(keyword)
+            if row is None:
+                return False
+            self.dev.wait_medium(f"等任务「{row.name}」跳转")
+            self._dwell_and_return(coin, dwell)
+        return True
+
+    def run_coin_tasks(self, plan: dict[str, int | None], dwell: float = 6.0) -> CoinTaskResult:
+        """按计划反复执行金币任务（同一任务可多次，例如「好物随心逛」10 次）。
+
+        Args:
+            plan: 任务名关键词 → 次数。值为 None 表示「做完页面写的剩余次数」
+                （任务名自带进度，形如 ``好物随心逛(0/5)``）。关键词用包含匹配。
+            dwell: 任务跳转页的停留秒数，太短会被判无效。
+
+        Returns:
+            CoinTaskResult：任务清单、完成次数、失败原因、截图。
+        """
+        result = CoinTaskResult()
+        with step("回到首页并进入金币中心", screenshot_on_error=self.dev):
+            coin = self._enter_coin_center()
+        if coin is None:
+            result.message = "推荐页未投放「领淘金币」入口，无法进入金币中心"
+            return result
+
+        rows = self._read_task_list(coin, result)
+        if not rows:
+            return result
+
+        for keyword, times in plan.items():
+            limit = times if times is not None else self._remaining_of(rows, keyword)
+            if not limit:
+                result.failures.append(f"{keyword}(页面上没有可做的次数)")
+                continue
+            for index in range(limit):
+                if not self._run_one_coin_task(coin, keyword, dwell):
+                    result.failures.append(f"{keyword}(第 {index + 1} 次未命中)")
+                    break
+                result.completed[keyword] = result.completed.get(keyword, 0) + 1
+
+        result.screenshot = coin.capture("task_after")
+        logger.info("任务执行结果: 完成 %d 次，失败 %s", result.total_completed, result.failures)
+        note(完成数=result.total_completed, 失败="、".join(result.failures) or "无")
         return result
 
     # ------------------------------------------------------------------ #

@@ -18,8 +18,10 @@ from data.constant.taobao import (
     COIN_CLOSE_TEXTS,
     COIN_PAGE_READY_DESCS,
     COIN_TASK_ACTION_TEXTS,
+    COIN_TASK_CENTER_TEXTS,
+    COIN_TASK_DONE_HINTS,
 )
-from data.entity.taobao import CoinSnapshot
+from data.entity.taobao import CoinSnapshot, TaskRow, TextNode
 from pages.base_page import BasePage
 
 
@@ -27,6 +29,21 @@ logger = get_logger(__name__)
 
 #: 金币余额合理区间上限（超过这个数一定是把页面上的其它数字吃进来了）
 MAX_REASONABLE_BALANCE = 10_000_000
+
+#: 任务名与按钮配行时允许的纵向偏差（px，金币页行高约 100~140）
+ROW_Y_TOLERANCE = 80
+
+#: 任务名尾部的进度，形如「好物随心逛(0/5)」
+PROGRESS_PATTERN = re.compile(r"\(\s*(\d+)\s*/\s*(\d+)\s*\)")
+
+
+def parse_progress(*texts: str) -> tuple[int, int]:
+    """从任务行文案里取 (已完成, 总数)；没有进度后缀返回 (0, 0)。"""
+    for text in texts:
+        match = PROGRESS_PATTERN.search(text or "")
+        if match:
+            return int(match.group(1)), int(match.group(2))
+    return 0, 0
 
 
 class CoinPage(BasePage):
@@ -52,6 +69,9 @@ class CoinPage(BasePage):
     #: 任务操作按钮
     TASK_ACTION_SELECTORS: tuple[str, ...] = tuple(f"text={text}" for text in COIN_TASK_ACTION_TEXTS)
 
+    #: 任务列表入口（金币首页的「去赚能量」）
+    TASK_CENTER_SELECTORS: tuple[str, ...] = tuple(f"text={text}" for text in COIN_TASK_CENTER_TEXTS)
+
     #: 关闭 / 返回类按钮
     CLOSE_SELECTORS: tuple[str, ...] = tuple(f"desc={text}" for text in COIN_CLOSE_TEXTS[:3])
 
@@ -70,28 +90,40 @@ class CoinPage(BasePage):
     # ------------------------------------------------------------------ #
     # 一次遍历取全量
     # ------------------------------------------------------------------ #
-    def _visible_texts(self) -> list[tuple[str, str]]:
-        """收集当前页所有可见元素的 (text, content-desc)。
+    def _visible_nodes(self) -> list[TextNode]:
+        """收集当前页所有可见文案节点（含中心坐标）。
 
         整个类**只允许在这里做全量遍历**，其它方法复用它或 ``snapshot()``：
         金币页元素数以千计，一次 ``find_elements`` 就要数秒。
         """
-        results: list[tuple[str, str]] = []
+        nodes: list[TextNode] = []
         try:
             elements = self.dev.driver.find_elements(By.XPATH, "//*[@text or @content-desc]")
         except (WebDriverException, StaleElementReferenceException):
-            return results
+            return nodes
         for element in elements:
             try:
                 if not element.is_displayed():
                     continue
                 text = (element.text or "").strip()
                 desc = (element.get_attribute("content-desc") or "").strip()
-                if text or desc:
-                    results.append((text, desc))
+                if not text and not desc:
+                    continue
+                rect = element.rect
+                nodes.append(
+                    TextNode(
+                        text=text,
+                        desc=desc,
+                        x=rect["x"] + rect["width"] // 2,
+                        y=rect["y"] + rect["height"] // 2,
+                    )
+                )
             except (WebDriverException, StaleElementReferenceException):
                 continue
-        return results
+        return nodes
+
+    def _visible_texts(self) -> list[tuple[str, str]]:
+        return [(node.text, node.desc) for node in self._visible_nodes()]
 
     def _parse_balance(self, texts: list[tuple[str, str]]) -> int:
         """从「含金币的文案」里解析余额；解析不到或数值不合理返回 -1。"""
@@ -115,14 +147,9 @@ class CoinPage(BasePage):
     def snapshot(self) -> CoinSnapshot:
         """一次遍历取余额 + 签到态 + 任务名。
 
-        重页面保护：金币小镇是 themis 容器且节点数以千计，一次
-        ``find_elements('//*[@text]')`` 会直接把 UiAutomator2 的
-        instrumentation **拖崩**（实测报 ``instrumentation process is not running``，
-        整个会话报废）。所以命中渲染容器时**直接返回空快照**，不遍历。
+        双 11 金币小镇虽然是 TMSActivity（themis 容器），但实测原生层是**有文案**的
+        （`去赚能量`、`我的车库` 都能读到），所以不再按容器短路；遍历本身包了异常兜底。
         """
-        if self.on_coin_container():
-            logger.info("金币页为 themis/Weex 渲染容器，跳过内容遍历（避免 instrumentation 崩溃），返回空快照")
-            return CoinSnapshot()
         texts = self._visible_texts()
         snap = CoinSnapshot(text_nodes=len(texts))
         if not texts:
@@ -194,6 +221,124 @@ class CoinPage(BasePage):
                 hit += 1
         logger.warning("任务列表里只有 %d 个可点按钮，取不到第 %d 个", hit, index + 1)
         return False
+
+    # ------------------------------------------------------------------ #
+    # 任务列表（去赚能量）
+    # ------------------------------------------------------------------ #
+    def open_task_center(self) -> bool:
+        """从金币首页点「去赚能量」进任务列表；入口不存在返回 False。"""
+        selector = self.exists_any(*self.TASK_CENTER_SELECTORS, timeout=3.0)
+        if not selector:
+            logger.warning("未找到「去赚能量」入口（候选 %s 均未命中）", list(self.TASK_CENTER_SELECTORS))
+            return False
+        logger.info("点击任务列表入口 %s", selector)
+        self.tap_center(selector, timeout=2.0)
+        self.dev.wait_medium("等任务列表渲染")
+        return True
+
+    def task_rows(self) -> list[TaskRow]:
+        """把任务名与操作按钮按纵坐标配成行。
+
+        淘宝把「标题 + 副标题 + 按钮」渲染成三段独立节点、没有可读的行容器，
+        所以只能靠纵坐标配对：按钮左侧、同一行高内的文案都算这一行。
+        任务名尾部的 ``(0/5)`` 会解析成已完成/总次数，``remaining`` 直接可用。
+        """
+        nodes = self._visible_nodes()
+        reserved = set(COIN_TASK_ACTION_TEXTS) | set(COIN_TASK_CENTER_TEXTS)
+        actions = [node for node in nodes if node.text in COIN_TASK_ACTION_TEXTS]
+        done_marks = [
+            node for node in nodes if node.text and any(hint in node.text for hint in COIN_TASK_DONE_HINTS)
+        ]
+        labels = [
+            node
+            for node in nodes
+            if node.text and node.text not in reserved and not any(hint in node.text for hint in COIN_TASK_DONE_HINTS)
+        ]
+
+        rows: list[TaskRow] = []
+        used: set[int] = set()
+
+        def _band(anchor: TextNode) -> list[TextNode]:
+            # 就近优先；同距离时取靠上的那个（标题在副标题之上）
+            band = [
+                n
+                for n in labels
+                if id(n) not in used and n.x < anchor.x and abs(n.y - anchor.y) <= ROW_Y_TOLERANCE
+            ]
+            return sorted(band, key=lambda n: (abs(n.y - anchor.y), n.y))
+
+        for action in actions:
+            band = _band(action)
+            if not band:
+                continue
+            primary = band[0]
+            used.add(id(primary))
+            aliases = tuple(node.text for node in band[1:])
+            done_count, total_count = parse_progress(primary.text, *aliases)
+            rows.append(
+                TaskRow(
+                    name=primary.text,
+                    action=action.text,
+                    x=action.x,
+                    y=action.y,
+                    aliases=aliases,
+                    done_count=done_count,
+                    total_count=total_count,
+                )
+            )
+
+        for mark in done_marks:
+            band = _band(mark)
+            if not band:
+                continue
+            primary = band[0]
+            used.add(id(primary))
+            aliases = tuple(node.text for node in band[1:])
+            done_count, total_count = parse_progress(primary.text, *aliases)
+            rows.append(
+                TaskRow(
+                    name=primary.text,
+                    y=mark.y,
+                    done=True,
+                    aliases=aliases,
+                    done_count=done_count,
+                    total_count=total_count,
+                )
+            )
+
+        logger.info(
+            "任务行 %d 条: %s",
+            len(rows),
+            [(row.name, row.action or "已完成", row.remaining) for row in rows],
+        )
+        return rows
+
+    def do_task_by_name(self, keyword: str, max_swipes: int = 3) -> TaskRow | None:
+        """点名字包含 keyword 且未完成的任务按钮；找不到返回 None。
+
+        任务列表一屏放不下：没命中就下滑重试，滑到底仍没有才算找不到。
+        """
+        rows: list[TaskRow] = []
+        for attempt in range(max_swipes + 1):
+            rows = self.task_rows()
+            for row in rows:
+                if row.clickable and row.matches(keyword):
+                    logger.info("点击任务「%s」的「%s」按钮 @ (%d, %d)", row.name, row.action, row.x, row.y)
+                    self.dev.tap_xy(row.x, row.y)
+                    return row
+            if attempt < max_swipes:
+                self.scroll_down()
+        logger.warning("未找到可执行的任务 %r（当前页任务行为 %s）", keyword, [row.name for row in rows])
+        return None
+
+    def back_to_coin_center(self, max_backs: int = 2) -> bool:
+        """从任务跳转页按返回键退回金币中心，回来返回 True。"""
+        for _ in range(max_backs + 1):
+            if self.on_coin_container():
+                return True
+            self.back()
+            self.dev.wait_medium("返回金币中心")
+        return self.on_coin_container()
 
     def close(self) -> bool:
         """关闭金币页回到上一页（优先点关闭按钮，退化为返回键）。"""
