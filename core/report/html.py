@@ -188,6 +188,65 @@ pre.tb{background:#070d18;border:1px solid var(--line);border-radius:6px;padding
 #lb img{max-width:96vw;max-height:92vh;border:1px solid var(--line2);border-radius:5px;
   box-shadow:0 24px 80px rgba(0,0,0,.8)}
 
+/* ---------- 分组 ---------- */
+.group{background:var(--bg2);border:1px solid var(--line);border-radius:9px;margin-bottom:14px;overflow:hidden}
+.group>summary{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;
+  list-style:none;user-select:none}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary:hover{background:var(--panel2)}
+.group .gname{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--blue2);min-width:130px}
+.group .gbar{flex:1;max-width:320px;height:5px;background:var(--line2);border-radius:3px;overflow:hidden}
+.group .gbar i{display:block;height:100%;background:var(--ok)}
+.group.hasfail .gbar i{background:var(--bad)}
+.group .gstat{font-family:var(--mono);font-size:11.5px;color:var(--ink3);margin-left:auto}
+.gbody{padding:12px 14px 4px;border-top:1px solid var(--line)}
+
+/* ---------- 失败概览 ---------- */
+.fails{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.fail{background:var(--badbg);border:1px solid rgba(242,80,106,.3);border-left:3px solid var(--bad);
+  border-radius:7px;padding:12px 15px}
+.fail .ftype{font-family:var(--mono);font-size:13px;color:var(--bad);font-weight:600;
+  display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.fail .fcount{font-size:11px;color:var(--ink2);background:rgba(242,80,106,.18);
+  border-radius:10px;padding:1px 8px;flex-shrink:0}
+.fail .fcases{margin-top:7px;font-size:12px;color:var(--ink2);line-height:1.7}
+
+/* ---------- 表格 ---------- */
+.tblwrap{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);font-weight:600;padding:9px 14px;
+  border-bottom:1px solid var(--line)}
+.tbl td{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--ink)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .num{font-family:var(--mono);font-size:12.5px;color:var(--ink2);text-align:right;white-space:nowrap}
+.tbl .st{font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.tbl .st.passed{color:var(--ok)} .tbl .st.failed,.tbl .st.error{color:var(--bad)}
+.tbl .st.skipped{color:var(--skip)}
+
+/* ---------- 步骤截图 ---------- */
+.stepshot{margin:2px 0 8px 19px}
+.stepshot img{max-width:230px;border:1px solid var(--line2);border-radius:5px;
+  cursor:zoom-in;opacity:.95;display:block}
+.stepshot img:hover{opacity:1;border-color:var(--blue)}
+
+/* ---------- 用例说明 ---------- */
+.desc{color:var(--ink2);font-size:12.5px;line-height:1.75;white-space:pre-wrap;
+  background:var(--panel2);border-left:2px solid var(--line2);border-radius:0 5px 5px 0;
+  padding:9px 13px;margin-top:10px}
+
+/* ---------- 索引页 ---------- */
+.runrow{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:12px 16px;margin-bottom:8px;text-decoration:none;color:inherit;
+  transition:.15s}
+.runrow:hover{border-color:var(--blue);background:var(--panel2)}
+.runrow .when{font-family:var(--mono);font-size:12.5px;color:var(--ink2);min-width:150px}
+.runrow .bar{flex:1;max-width:240px;height:6px;background:var(--line2);border-radius:3px;overflow:hidden}
+.runrow .bar i{display:block;height:100%;background:var(--ok)}
+.runrow.bad .bar i{background:var(--bad)}
+.runrow .rate{font-family:var(--mono);font-size:12.5px;min-width:62px;text-align:right;color:var(--ink2)}
+.runrow .cnt{font-family:var(--mono);font-size:11.5px;color:var(--ink3);min-width:120px;text-align:right}
+
 /* ---------- 空状态 ---------- */
 .empty{text-align:center;padding:44px;color:var(--ink3);font-family:var(--mono);font-size:13px;
   border:1px dashed var(--line2);border-radius:8px}
@@ -212,17 +271,23 @@ footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
 
 _JS = """
 function toggleAll(open){
-  document.querySelectorAll('details.case').forEach(function(d){ d.open = open; });
+  document.querySelectorAll('details.case, details.group').forEach(function(d){ d.open = open; });
+}
+function toggleGroups(open){
+  document.querySelectorAll('details.group').forEach(function(d){ d.open = open; });
 }
 function openFailed(){
+  document.querySelectorAll('details.group').forEach(function(g){
+    g.open = g.classList.contains('hasfail');
+  });
   document.querySelectorAll('details.case').forEach(function(d){
-    d.open = d.classList.contains('failed');
+    d.open = d.classList.contains('failed') || d.classList.contains('error');
   });
 }
 document.addEventListener('click', function(e){
-  var shot = e.target.closest('.shot');
+  var shot = e.target.closest('.shot') || (e.target.tagName === 'IMG' && e.target.closest('.stepshot') ? e.target : null);
   if (shot){
-    var img = shot.querySelector('img');
+    var img = shot.tagName === 'IMG' ? shot : shot.querySelector('img');
     if (img){
       var lb = document.getElementById('lb');
       lb.querySelector('img').src = img.src;
@@ -300,19 +365,28 @@ def _render_context(case: CaseRecord) -> str:
     return f'<div class="sub">业务上下文</div><div class="ctx">{chips}</div>'
 
 
-def _render_steps(case: CaseRecord) -> str:
+def _render_steps(case: CaseRecord, budget: "_ImageBudget | None" = None) -> str:
     if not case.steps:
         return ""
     rows = []
     for step in case.steps:
         failed = " failed" if step.status == FAILED else ""
+        indent = f' style="padding-left:{step.level * 18}px"' if step.level else ""
         rows.append(
-            f'<div class="step{failed}"><div class="mk"></div>'
-            f'<div class="nm">{_esc(step.name)}</div>'
+            f'<div class="step{failed}"{indent}><div class="mk"></div>'
+            f'<div class="nm">{_esc(step.display_name)}</div>'
             f'<div class="du">{human_duration(step.duration)}</div></div>'
         )
         if step.error:
             rows.append(f'<div class="err">{_esc(step.error)}</div>')
+        # 步骤级截图：失败步骤自己那一屏，比用例末尾的截图更贴近现场
+        if step.screenshot:
+            uri = budget.take(step.screenshot) if budget is not None else image_to_data_uri(step.screenshot)
+            if uri:
+                rows.append(
+                    f'<div class="stepshot"><img src="{uri}" alt="{_esc(step.screenshot.name)}" '
+                    f'loading="lazy"></div>'
+                )
     return f'<div class="sub">执行步骤（{len(case.steps)} 步）</div><div class="steps">{"".join(rows)}</div>'
 
 
@@ -336,10 +410,14 @@ def _render_error(case: CaseRecord) -> str:
 
 
 def _render_shots(case: CaseRecord, budget: "_ImageBudget | None" = None) -> str:
-    if not case.screenshots:
+    # 步骤里已经展示过的截图不再重复渲染（collector 会把它同时登记到 case.screenshots，
+    # 不去重的话同一张图会出现两次，还白吃一份体积预算）
+    shown_in_steps = {s.screenshot for s in case.steps if s.screenshot}
+    shots = [p for p in case.screenshots if p not in shown_in_steps]
+    if not shots:
         return ""
     imgs = []
-    for path in case.screenshots:
+    for path in shots:
         uri = budget.take(path) if budget is not None else image_to_data_uri(path)
         if uri:
             imgs.append(
@@ -396,30 +474,126 @@ class _ImageBudget:
 
 
 def _render_case(case: CaseRecord, budget: _ImageBudget | None = None) -> str:
-    open_attr = " open" if case.status in {FAILED, ERROR} else ""
+    open_attr = " open" if case.is_failure else ""
+    # 跳过的用例不显示耗时：它的 duration 其实是「等夹具建会话」的时间（设备离线时可达几十秒），
+    # 标出来会让人误以为这条用例跑了很久
+    dur_text = "—" if case.status == SKIPPED else human_duration(case.duration)
+    markers = ""
+    if case.markers:
+        chips = "".join(f"<span>@{_esc(m)}</span>" for m in case.markers)
+        markers = f'<div class="sub">用例标记</div><div class="ctx">{chips}</div>'
+    description = f'<div class="desc">{_esc(case.description)}</div>' if case.description else ""
     return (
         f'<details class="case {_esc(case.status)}"{open_attr}>'
         f"<summary>"
         f'<span class="badge {_esc(case.status)}">{_status_label(case.status)}</span>'
         f'<span class="title">{_esc(case.name)}</span>'
-        f'<span class="dur">{human_duration(case.duration)}</span>'
+        f'<span class="dur">{dur_text}</span>'
         f"</summary>"
         f'<div class="body">'
+        f"{description}"
         f"{_render_context(case)}"
         f"{_render_error(case)}"
-        f"{_render_steps(case)}"
+        f"{_render_steps(case, budget)}"
         f"{_render_shots(case, budget)}"
+        f"{markers}"
         f'<div class="sub" style="margin-top:16px">pytest 节点</div>'
         f'<div class="ctx"><span><b>{_esc(case.nodeid)}</b></span></div>'
         f"</div></details>"
     )
 
 
-def _render_cases(run: RunRecord, budget: _ImageBudget | None = None) -> str:
-    cases = run.sorted_cases()
-    if not cases:
+def _render_groups(run: RunRecord, budget: _ImageBudget | None = None) -> str:
+    """按测试文件分组渲染。失败的分组默认展开，全绿的分组默认折叠。"""
+    groups = run.groups()
+    if not groups:
         return '<div class="empty">本次运行没有收集到用例</div>'
-    return "".join(_render_case(c, budget) for c in cases)
+    blocks = []
+    for group in groups:
+        cls = "group hasfail" if group.has_failure else "group"
+        open_attr = " open" if group.has_failure else ""
+        body = "".join(_render_case(c, budget) for c in group.sorted_cases())
+        blocks.append(
+            f'<details class="{cls}"{open_attr}>'
+            f"<summary>"
+            f'<span class="gname">{_esc(group.name)}</span>'
+            f'<span class="gbar"><i style="width:{min(group.pass_rate, 100):.0f}%"></i></span>'
+            f'<span class="gstat">{group.passed}/{group.total} 通过 · {group.failed} 失败 · '
+            f"{group.skipped} 跳过 · {human_duration(group.duration)}</span>"
+            f"</summary>"
+            f'<div class="gbody">{body}</div>'
+            f"</details>"
+        )
+    return "".join(blocks)
+
+
+def _render_failure_panel(run: RunRecord) -> str:
+    """失败原因聚合：同一异常类型合并，一眼看出是「选择器失效」还是「网络挂了」。"""
+    stats = run.error_stats()
+    if not stats:
+        return ""
+    cards = []
+    for stat in stats:
+        names = " · ".join(_esc(n) for n in stat.cases[:6])
+        more = f" 等 {stat.count} 条" if stat.count > 6 else ""
+        cards.append(
+            f'<div class="fail"><div class="ftype">{_esc(stat.error_type)}'
+            f'<span class="fcount">{stat.count} 条</span></div>'
+            f'<div class="fcases">{names}{more}</div></div>'
+        )
+    return f'<section><h2>失败概览</h2><div class="fails">{"".join(cards)}</div></section>'
+
+
+def _render_slowest(run: RunRecord, limit: int = 5) -> str:
+    slowest = run.slowest(limit)
+    if not slowest:
+        return ""
+    rows = "".join(
+        f"<tr><td>{_esc(c.name)}</td>"
+        f'<td class="num">{human_duration(c.duration)}</td>'
+        f'<td class="st {_esc(c.status)}">{_status_label(c.status)}</td></tr>'
+        for c in slowest
+    )
+    return (
+        "<section><h2>最慢用例</h2><div class=\"tblwrap\"><table class=\"tbl\">"
+        '<thead><tr><th>用例</th><th class="num">耗时</th><th>结果</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table></div></section>"
+    )
+
+
+def _render_options(run: RunRecord) -> str:
+    """运行参数与 marker 统计：复现问题时要什么都在这一块。"""
+    rows: list[tuple[str, str]] = []
+    if run.pytest_version:
+        rows.append(("pytest", run.pytest_version))
+    if run.exit_status_text:
+        rows.append(("退出码", f"{run.exit_status} · {run.exit_status_text}"))
+    rows.extend(run.options.items())
+
+    parts = []
+    if rows:
+        body = "".join(
+            f'<div><span class="k">{_esc(k)}</span><span class="v">{_esc(v)}</span></div>'
+            for k, v in rows
+        )
+        parts.append(f'<div class="env">{body}</div>')
+
+    markers = run.marker_stats()
+    if markers:
+        mrows = "".join(
+            f"<tr><td>@{_esc(name)}</td>"
+            f'<td class="num">{total}</td>'
+            f'<td class="num">{passed}</td></tr>'
+            for name, total, passed in markers
+        )
+        parts.append(
+            '<div class="tblwrap" style="margin-top:12px"><table class="tbl">'
+            '<thead><tr><th>用例标记</th><th class="num">用例数</th>'
+            f'<th class="num">通过</th></tr></thead><tbody>{mrows}</tbody></table></div>'
+        )
+    if not parts:
+        return ""
+    return f'<section><h2>运行参数</h2>{"".join(parts)}</section>'
 
 
 # ---------------------------------------------------------------------- #
@@ -462,6 +636,7 @@ def render_html(run: RunRecord, report_path: Path | None = None) -> str:
       <span>START · {stamp}</span>
       <span>DURATION · {duration}</span>
       <span>CASES · {run.total}</span>
+      <span>RESULT · {_esc(run.exit_status_text or "未执行")}</span>
       {command}
     </div>
     <div class="verdict {verdict_cls}">{_esc(verdict_text)}</div>
@@ -470,21 +645,26 @@ def render_html(run: RunRecord, report_path: Path | None = None) -> str:
 
 <div class="wrap">
   {_render_stats(run)}
+  {_render_failure_panel(run)}
   {_render_env(run)}
+  {_render_options(run)}
 
   <section>
-    <h2>用例明细</h2>
+    <h2>用例明细（按文件分组）</h2>
     <div class="toolbar">
       <button onclick="openFailed()">只看失败</button>
       <button onclick="toggleAll(true)">全部展开</button>
       <button onclick="toggleAll(false)">全部折叠</button>
+      <button onclick="toggleGroups(false)">折叠分组</button>
     </div>
-    {_render_cases(run, budget)}
+    {_render_groups(run, budget)}
   </section>
+
+  {_render_slowest(run)}
 
   <footer>
     <span>Generated by core.report · 单文件自包含报告</span>
-    <span>{_esc(run.env.device_model or "no device")}</span>
+    <span>{_esc(run.exit_status_text or "未执行")} · {_esc(run.env.device_model or "no device")}</span>
   </footer>
 </div>
 
@@ -503,35 +683,68 @@ def write_html(run: RunRecord, path: Path) -> Path:
 
 
 def write_json(run: RunRecord, path: Path) -> Path:
-    """导出 JSON，方便 CI 或二次分析消费。"""
+    """导出 JSON，方便 CI 或二次分析消费（结构与 HTML 报告一一对应）。"""
     payload = {
+        "schema": 2,
         "title": run.title,
         "started_at": run.started_at,
         "finished_at": run.finished_at,
-        "duration": run.duration,
+        "duration": round(run.duration, 3),
+        "command": run.command,
+        "exit_status": run.exit_status,
+        "exit_status_text": run.exit_status_text,
+        "pytest_version": run.pytest_version,
         "summary": {
             "total": run.total,
             "passed": run.passed,
             "failed": run.failed,
+            "errors": run.errors,
             "skipped": run.skipped,
+            "executed": run.executed,
             "pass_rate": round(run.pass_rate, 2),
+            "avg_case_duration": round(run.avg_case_duration, 3),
         },
         "env": dict(run.env.as_rows()),
+        "options": run.options,
+        "groups": [
+            {
+                "name": g.name,
+                "total": g.total,
+                "passed": g.passed,
+                "failed": g.failed,
+                "skipped": g.skipped,
+                "duration": round(g.duration, 3),
+                "pass_rate": round(g.pass_rate, 2),
+            }
+            for g in run.groups()
+        ],
+        "failures": [
+            {"error_type": e.error_type, "count": e.count, "cases": e.cases}
+            for e in run.error_stats()
+        ],
         "cases": [
             {
                 "nodeid": c.nodeid,
                 "name": c.name,
+                "file": c.file,
+                "group": c.group,
+                "markers": c.markers,
+                "description": c.description,
                 "status": c.status,
+                "started_at": c.started_at,
                 "duration": round(c.duration, 3),
                 "context": c.context,
                 "error_type": c.error_type,
                 "error_message": c.error_message,
+                "failed_step": c.first_failed_step.display_name if c.first_failed_step else "",
                 "steps": [
                     {
-                        "name": s.name.strip(),
+                        "name": s.display_name,
+                        "level": s.level,
                         "status": s.status,
                         "duration": round(s.duration, 3),
                         "error": s.error,
+                        "screenshot": str(s.screenshot) if s.screenshot else "",
                     }
                     for s in c.steps
                 ],
@@ -543,3 +756,120 @@ def write_json(run: RunRecord, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+# ---------------------------------------------------------------------- #
+# 运行历史索引页
+# ---------------------------------------------------------------------- #
+def write_index(out_dir: Path, title: str = "运行历史") -> Path:
+    """扫描目录内所有 ``report_*.json``，生成可点击跳转的 ``index.html``。
+
+    为什么需要它：报告按时间戳命名，跑几十次后 artifacts/reports 里全是文件，
+    根本分不清哪份是刚才那次、通过率是在变好还是变差。
+    """
+    entries: list[dict] = []
+    for json_path in out_dir.glob("report_*.json"):
+        try:
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        entries.append(_index_entry(payload, json_path))
+    entries.sort(key=lambda e: e["started_at"], reverse=True)
+
+    path = out_dir / "index.html"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_index(entries, title), encoding="utf-8")
+    return path
+
+
+def _index_entry(payload: dict, json_path: Path) -> dict:
+    summary = payload.get("summary") or {}
+    env = payload.get("env") or {}
+    return {
+        "html": json_path.with_suffix(".html").name,
+        "started_at": float(payload.get("started_at") or 0.0),
+        "title": payload.get("title") or "",
+        "total": int(summary.get("total") or 0),
+        "passed": int(summary.get("passed") or 0),
+        "failed": int(summary.get("failed") or 0),
+        "skipped": int(summary.get("skipped") or 0),
+        "pass_rate": float(summary.get("pass_rate") or 0.0),
+        "duration": float(payload.get("duration") or 0.0),
+        "command": payload.get("command") or "",
+        "device": env.get("设备型号") or env.get("设备序列号") or "",
+    }
+
+
+def render_index(entries: list[dict], title: str = "运行历史") -> str:
+    """渲染历史索引页（同一套工业蓝图样式）。"""
+    latest = entries[0] if entries else {}
+    avg_rate = sum(e["pass_rate"] for e in entries) / len(entries) if entries else 0.0
+
+    cards = [
+        ("blue", "运行次数", str(len(entries))),
+        ("blue", "最近通过率", f"{float(latest.get('pass_rate') or 0):.1f}%"),
+        ("ok", "历史平均", f"{avg_rate:.1f}%"),
+        ("bad", "最近失败", str(latest.get("failed", 0))),
+    ]
+    stats = "".join(
+        f'<div class="stat {cls}"><div class="k">{_esc(k)}</div><div class="v">{_esc(v)}</div></div>'
+        for cls, k, v in cards
+    )
+
+    rows = "".join(_render_index_row(e) for e in entries)
+    if not rows:
+        rows = '<div class="empty">还没有历史运行记录。跑一次 pytest 就会出现在这里。</div>'
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{_esc(title)} · AndroidAutomation</title>
+<style>{_CSS}</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span>AndroidAutomation · Run History</div>
+    <h1>{_esc(title)}</h1>
+    <div class="meta"><span>RECORDS · {len(entries)}</span><span>最新在前</span></div>
+  </div>
+</header>
+<div class="wrap">
+  <div class="stats" style="grid-template-columns:repeat(4,1fr)">{stats}</div>
+  <section>
+    <h2>历史运行</h2>
+    {rows}
+  </section>
+  <footer>
+    <span>Generated by core.report · 每次 pytest 运行都会刷新</span>
+    <span>{time.strftime("%Y-%m-%d %H:%M:%S")}</span>
+  </footer>
+</div>
+</body>
+</html>
+"""
+
+
+def _render_index_row(entry: dict) -> str:
+    rate = min(max(entry.get("pass_rate", 0.0), 0.0), 100.0)
+    cls = "runrow bad" if entry.get("failed") else "runrow"
+    when = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry.get("started_at") or time.time()))
+    failed = entry.get("failed", 0)
+    skipped = entry.get("skipped", 0)
+    # 分母用「执行过的用例」—— 与通过率口径保持一致，否则「13/23 通过 + 100%」看起来自相矛盾
+    executed = entry.get("total", 0) - skipped
+    summary = f"{entry.get('passed', 0)}/{executed} 通过"
+    if failed:
+        summary += f" · {failed} 失败"
+    if skipped:
+        summary += f" · {skipped} 跳过"
+    return (
+        f'<a class="{cls}" href="{_esc(entry.get("html", ""))}">'
+        f'<span class="when">{when}</span>'
+        f'<span class="bar"><i style="width:{rate:.0f}%"></i></span>'
+        f'<span class="rate">{rate:.1f}%</span>'
+        f'<span class="cnt">{_esc(summary)}</span>'
+        f"</a>"
+    )

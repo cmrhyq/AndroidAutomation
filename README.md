@@ -233,12 +233,15 @@ dev = AndroidDevice(create_driver(cfg), cfg)
 
 ```
 artifacts/reports/report_20261029_003000.html   # 自包含，截图已 base64 内嵌
-artifacts/reports/report_20261029_003000.json   # 同数据，供 CI 消费
+artifacts/reports/report_20261029_003000.json   # 同数据，供 CI 消费（schema=2）
+artifacts/reports/index.html                    # 运行历史索引，每次运行自动刷新
 ```
 
 ```bash
 pytest --report-dir=out          # 换输出目录
 pytest --report-title="夜间回归"  # 换标题
+pytest --report-open             # 跑完自动用浏览器打开
+pytest --report-keep=5           # 只保留最近 5 份（默认 20，0 = 不清理）
 pytest --no-report               # 彻底关闭（零开销）
 ```
 
@@ -246,13 +249,19 @@ pytest --no-report               # 彻底关闭（零开销）
 
 | 区块 | 说明 |
 | --- | --- |
-| 顶部结论 | 全部通过 / N 个失败 + 通过率、总耗时、命令行 |
-| 统计卡 | 总数、通过、失败、跳过、通过率、耗时 |
-| 运行环境 | 设备型号、序列号、Android 版本、分辨率、应用版本、Appium 版本 |
-| 用例明细 | 失败**自动展开**，绿色折叠；「只看失败」一键过滤 |
-| 执行步骤 | 每个业务步骤的耗时与状态，失败步骤红标并带异常信息 |
-| 失败详情 | 异常类型 + 消息 + 可复制的完整 traceback |
-| 现场截图 | 步骤失败即截图，点击放大看原图 |
+| 顶部结论 | 全部通过 / N 个失败 + 通过率、总耗时、命令行、pytest 退出码 |
+| 统计卡 | 总数、通过、失败（含 error）、跳过、通过率、总耗时 |
+| 失败概览 | 同一异常类型合并计数，一眼分辨「选择器失效」还是「环境故障」 |
+| 运行环境 | 设备型号、序列号、Android 版本、分辨率、包名、应用版本、Appium 版本（两级采集，见下） |
+| 运行参数 | pytest 版本、退出码、`AA_WAIT_SCALE`、搜索词等；附 marker 维度统计 |
+| 用例明细 | **按测试文件分组**，含失败的组自动展开；组标题显示组内通过率条 |
+| 执行步骤 | 嵌套步骤缩进展示，失败步骤红标 + 异常信息 + **该步骤自己的截图** |
+| 失败详情 | 异常类型 + 消息 + 自动标出「失败步骤」+ 可复制 traceback |
+| 最慢用例 | Top 5 耗时排行，定位拖慢回归的用例 |
+| 历史索引 | `index.html` 列出历次运行（时间、通过率条、失败数），点击跳转 |
+
+**环境信息的两级采集**：先建会话后从 driver capabilities 取（最准），会话没起来时用
+`adb` + Appium `/status` 兜底；运行期优先、静态补空，所以「一条都没跑起来」的报告也不会是空白。
 
 **给业务流加步骤埋点**（可选，不加也能出报告）：
 
@@ -265,6 +274,13 @@ note(keyword="蓝牙耳机", 商品数=str(page.result_count()))
 ```
 
 `step` 在没有 pytest 时是透明 no-op，脚本里单独跑不会报错。
+
+报告模块自身有 13 条离线用例（`tests/test_report_offline.py`，`unit` 标记），
+不依赖设备，改样式或加字段后可秒级验证：
+
+```bash
+.venv/Scripts/python.exe -m pytest tests/test_report_offline.py -q
+```
 
 ### 6.2 淘宝渲染分层（写用例前必读）
 

@@ -87,11 +87,11 @@ Issues = "https://github.com/cmrhyq/AndroidAutomation/issues"
 path = "core/__init__.py"     # 读取其中的 __version__
 
 [tool.hatch.build.targets.wheel]
-packages = ["androidauto", "flows", "pages"]
+packages = ["core", "flows", "pages"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/androidauto",
+    "/core",
     "/flows",
     "/pages",
     "/scripts",
@@ -174,7 +174,7 @@ markers = [
 # 文档：https://coverage.readthedocs.io/en/latest/config.html
 # ----------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["androidauto"]             # 只统计框架本体（项目无 src/ 目录）
+source = ["core"]                    # 只统计框架本体（core/flows/pages 里 core 是基础设施）
 branch = true                        # 启用分支覆盖率
 omit = [
     "tests/*",
