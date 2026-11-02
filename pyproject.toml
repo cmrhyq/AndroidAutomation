@@ -74,6 +74,11 @@ test = [
     "pytest-xdist>=3.5.0",         # 并行测试
     "pytest-timeout>=2.3.0",       # 测试超时控制
 ]
+# 大麦抢票引擎（uiautomator2 直连，与 Appium 栈并存）
+# 不做硬依赖：只想跑 Appium 的使用者无需拉入 adbutils / requests / lxml。
+grab = [
+    "uiautomator2>=3.0,<4",
+]
 
 # ----------------------------------------------------------------------------
 # 项目链接（显示在 PyPI 页面）
@@ -92,11 +97,13 @@ Issues = "https://github.com/cmrhyq/AndroidAutomation/issues"
 path = "core/__init__.py"     # 读取其中的 __version__
 
 [tool.hatch.build.targets.wheel]
-packages = ["core", "flows", "pages"]
+packages = ["core", "damai", "data", "flows", "pages"]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/core",
+    "/damai",
+    "/data",
     "/flows",
     "/pages",
     "/scripts",
@@ -136,7 +143,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "flows", "pages"]  # 项目自身模块，排序归入第一方
+known-first-party = ["core", "damai", "data", "flows", "pages"]  # 项目自身模块，排序归入第一方
 
 # ----------------------------------------------------------------------------
 # mypy 配置（静态类型检查）
@@ -151,7 +158,7 @@ no_implicit_optional = true
 exclude = ["artifacts/", "tools/", "\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["appium.*", "selenium.*", "allure.*"]  # 第三方库无类型桩
+module = ["appium.*", "selenium.*", "allure.*", "uiautomator2.*", "adbutils.*"]  # 第三方库无类型桩
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------

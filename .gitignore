@@ -218,3 +218,6 @@ __marimo__/
 .env
 artifacts/
 .workbuddy/
+# 大麦抢票：真实配置含观演人姓名，不入库（模板见 damai/config.example.jsonc）
+damai/config.jsonc
+damai/config.local.jsonc

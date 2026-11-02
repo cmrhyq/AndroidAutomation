@@ -14,6 +14,10 @@ ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 SCREENSHOT_DIR = ARTIFACTS_DIR / "screenshots"
 PAGE_SOURCE_DIR = ARTIFACTS_DIR / "pages"
 LOG_DIR = ARTIFACTS_DIR / "logs"
+# 失败取证（UI 层级 + 截图 + 元数据），抢票失败后离线复盘用
+FAILURE_DIR = ARTIFACTS_DIR / "failures"
+# 每次运行的机器可读摘要（退出码、结局、耗时、模式）
+RUN_DIR = ARTIFACTS_DIR / "runs"
 
 _ENV_FILE = PROJECT_ROOT / ".env"
 
@@ -84,7 +88,7 @@ class DeviceConfig:
         return cls()
 
     def ensure_dirs(self) -> None:
-        for d in (SCREENSHOT_DIR, PAGE_SOURCE_DIR, LOG_DIR):
+        for d in (SCREENSHOT_DIR, PAGE_SOURCE_DIR, LOG_DIR, FAILURE_DIR, RUN_DIR):
             d.mkdir(parents=True, exist_ok=True)
 
     def summary(self) -> str:
