@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from damai.config import (
+from core.config.damai import (
     DEFAULT_CONFIG_PATH,
     DEPRECATED_CONFIG_KEYS,
     KNOWN_CONFIG_KEYS,
@@ -18,11 +18,11 @@ from damai.config import (
     load_jsonc,
     strip_jsonc_comments,
 )
-from damai.mode import GrabMode
+from data.constant.damai import GrabMode
 
 pytestmark = pytest.mark.unit
 
-EXAMPLE_CONFIG = Path(__file__).resolve().parent.parent / "damai" / "config.example.jsonc"
+EXAMPLE_CONFIG = Path(__file__).resolve().parent.parent / "config" / "damai.example.jsonc"
 
 
 def _config(**overrides: object) -> GrabConfig:
@@ -203,9 +203,10 @@ def test_config_hash_is_short_and_deterministic():
     assert len(config_hash({"a": 1})) == 12
 
 
-def test_default_config_path_points_into_package():
-    assert DEFAULT_CONFIG_PATH.name == "config.jsonc"
-    assert DEFAULT_CONFIG_PATH.parent.name == "damai"
+def test_default_config_path_points_into_project_config_dir():
+    """业务配置放项目根的 config/，与 .env 的设备参数分开。"""
+    assert DEFAULT_CONFIG_PATH.name == "damai.jsonc"
+    assert DEFAULT_CONFIG_PATH.parent.name == "config"
 
 
 def test_keywords_dedupes_and_skips_blank():

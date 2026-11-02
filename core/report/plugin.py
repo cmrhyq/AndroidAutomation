@@ -22,14 +22,18 @@ from core.report.environment import write_properties
 
 #: 测试文件 → Allure 的 feature 名（左侧功能树显示中文）
 _FEATURE_BY_FILE = {
-    "test_taobao": "淘宝 App 端到端",
-    "test_golden_coin": "淘金币",
+    "test_damai_config": "大麦 · 配置与模式",
+    "test_damai_text": "大麦 · 文本与日期",
+    "test_damai_logic": "大麦 · 页面判定",
+    "test_damai_nav": "大麦 · 搜索与场次",
+    "test_damai_price": "大麦 · 票档选择",
+    "test_damai_recovery": "大麦 · 取证与恢复",
     "test_allure_offline": "测试基建 · 报告",
 }
-_EPIC = "淘宝 UI 自动化"
+_EPIC = "大麦抢票"
 
 #: 报告里展示的运行参数（只展示有值的）
-_OPTION_KEYS = ("AA_WAIT_SCALE", "TAOBAO_KEYWORD", "APP_PACKAGE", "DEVICE_UDID")
+_OPTION_KEYS = ("AA_WAIT_SCALE", "APP_PACKAGE", "DEVICE_UDID")
 
 #: 这些内置 marker 不进 tag 列表（会把每条用例刷成 usefixtures）
 _IGNORED_MARKERS = {"usefixtures", "parametrize", "filterwarnings", "skip", "skipif", "xfail"}
@@ -237,7 +241,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             out = Path(str(config.rootpath)) / out
         out = out / "index.html"
 
-    html_path = _generate(results, out, single_file=single_file, title=f"淘宝 UI 自动化 · {stamp}")
+    html_path = _generate(results, out, single_file=single_file, title=f"大麦抢票 · {stamp}")
     if html_path is None:
         return
 
@@ -463,9 +467,9 @@ def _write_executor(results: Path, config: pytest.Config) -> None:
     payload = {
         "name": platform.node() or "local",
         "type": "pytest",
-        "buildName": "淘宝 UI 自动化 " + time.strftime("%Y-%m-%d %H:%M:%S"),
+        "buildName": "大麦抢票 " + time.strftime("%Y-%m-%d %H:%M:%S"),
         "buildUrl": "",
-        "reportName": "淘宝 UI 自动化测试报告",
+        "reportName": "大麦抢票测试报告",
     }
     try:
         (results / "executor.json").write_text(

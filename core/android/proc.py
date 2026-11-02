@@ -1,4 +1,4 @@
-"""子进程调用工具（Windows 上 npm 全局命令是 .cmd，需经 cmd /c 转手）。"""
+"""子进程调用工具（Windows 上 npm 装出来的全局命令是 .cmd，需经命令解释器转手）。"""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import subprocess
 def resolve_executable(cmd: str) -> list[str]:
     """把命令名解析成可直接交给 subprocess 的前缀。
 
-    Windows 上 npm 全局装出来的 appiums 是 appiums.CMD，shell=False 直接执行会
-    FileNotFoundError，必须先经 cmd /c 转一手。
+    Windows 上 npm 装出来的全局命令实际是 ``xxx.CMD``，shell=False 直接执行会
+    FileNotFoundError，必须先经命令解释器转一手。
     """
     path = shutil.which(cmd)
     if path is None:

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from damai.mode import GrabMode
+from data.constant.damai import GrabMode
 
 pytestmark = pytest.mark.unit
 

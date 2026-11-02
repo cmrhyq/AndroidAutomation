@@ -1,19 +1,19 @@
 """页面对象基类：多候选选择器轮询、显式等待、滚动查找、失败留证。
 
-候选元组 + 轮询定位（淘宝改版频繁，任一特征命中即算成功）；
-全部显式等待（implicit wait 恒为 0），等待节奏走 core.android.waits 的三档方法。"""
+候选元组 + 轮询定位（App 改版频繁，任一特征命中即算成功）；
+全部显式等待（implicit wait 恒为 0），等待节奏走 core.android.waits 的三档方法。
+
+设备后端无关：``dev`` 只要满足 :class:`core.android.actions.AndroidDevice` 的接口契约
+即可 —— 换驱动（uiautomator2 / 其它）时页面对象不用改。"""
 
 from __future__ import annotations
 
 import time
 from pathlib import Path
 
-from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
-
 from core.android.actions import AndroidDevice, Screen, to_by
+from core.android.locator import DeviceError, ElementStaleError
 from core.logger import get_logger
-from data.constant.taobao import TAOBAO_PACKAGE
-
 
 logger = get_logger(__name__)
 
@@ -27,8 +27,8 @@ class BasePage:
 
     #: 页面名，用于日志与失败信息
     name: str = "base"
-    #: 该页面/组件所属应用包名
-    package: str = TAOBAO_PACKAGE
+    #: 该页面/组件所属应用包名（子类必须覆盖）
+    package: str = ""
     #: 页面就绪的候选元素，命中任意一个即认为页面已加载
     ready_selectors: tuple[str, ...] = ()
     #: 默认超时（秒）
@@ -61,7 +61,7 @@ class BasePage:
             try:
                 if any(el.is_displayed() for el in self.dev.driver.find_elements(by, value)):
                     return selector
-            except (WebDriverException, StaleElementReferenceException):
+            except (DeviceError, ElementStaleError, AttributeError):
                 continue
         return None
 
@@ -137,16 +137,15 @@ class BasePage:
             for el in self.dev.driver.find_elements(by, value):
                 if el.is_displayed():
                     return el.rect
-        except (WebDriverException, StaleElementReferenceException):
+        except (DeviceError, ElementStaleError, AttributeError):
             pass
         return None
 
     def tap_center(self, *selectors: str, timeout: float | None = None) -> str:
         """按元素中心点击，返回命中的选择器。
 
-        为什么不用 ``element.click()``：淘宝详情页的「加入购物车」按钮
-        ``clickable=false``，WebDriver 的 click 会静默失败或抛不可交互异常；
-        用坐标点击则不受该属性影响。实测这是详情页唯一稳定的点击方式。
+        为什么不用 ``element.click()``：不少按钮的 ``clickable=false``，
+        原生 click 会静默失败或抛不可交互异常；用坐标点击则不受该属性影响。
         """
         selector = self.wait_any(*selectors, timeout=timeout)
         rect = self.rect_of(selector)
@@ -172,13 +171,13 @@ class BasePage:
             return default
         try:
             return self.dev.get_text(selector, timeout=timeout) or default
-        except WebDriverException:
+        except (DeviceError, RuntimeError):
             return default
 
     def text_or_desc(self, selector: str, timeout: float = 2.0) -> str:
         """读元素文案：优先 ``content-desc``，其次 ``text``；都没有返回空串。
 
-        为什么需要它：``desc=xxx`` 命中的元素（底部 tab、金币挂件、活动挂件）
+        为什么需要它：``desc=xxx`` 命中的元素（底部 tab、挂件、活动浮层）
         **只有 content-desc 没有 text**，直接 ``get_text`` 拿到的是空串，
         会让人误以为「元素找到了但读不出文案」（实测踩过）。
         """
@@ -193,7 +192,7 @@ class BasePage:
                     text = (element.text or "").strip()
                     if desc or text:
                         return desc or text
-            except (WebDriverException, StaleElementReferenceException):
+            except (DeviceError, ElementStaleError, AttributeError):
                 pass
             if time.monotonic() >= deadline:
                 return ""

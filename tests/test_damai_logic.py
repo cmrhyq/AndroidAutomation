@@ -1,24 +1,28 @@
-"""设备无关的判定逻辑：CTA 白名单、页面状态映射、票档面板状态、售罄识别。
+"""大麦链路纯逻辑单测：CTA 白名单、页面状态映射、UI 树解析、票档面板判定。
 
-这些判断直接决定「点不点、点哪里」，判错的后果是抢错流程或误报售罄，
-所以每一条都用真机结构摘录（tests/fixtures/damai/）钉死。
+这些函数都是「吃字符串/XML，吐布尔或结构」的纯函数，不需要设备 ——
+抢票链路上最容易出错、也最该被锁死的正是它们：点错按钮、认错页面、
+把预售票档当成可买，任何一个都会让整轮报废。
+
+夹具全部取自真机结构摘录（tests/fixtures/damai/）。
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
-from damai.constants import BLOCKED_TEXTS, SAFE_TEXTS
-from damai.guard import BuyButtonGuard, is_safe_to_click
-from damai.probe import (
-    PageProbe,
-    PageState,
-    detect_price_panel_state,
-    is_buy_button_sold_out,
-    state_from_activity,
+from core.android import ui_tree
+from data.constant.damai import BLOCKED_TEXTS, SAFE_TEXTS
+from data.entity.damai import PageState, state_from_activity
+from pages.components.damai_buy_bar import is_safe_to_click
+from pages.components.damai_price_panel import (
+    collapse_card_texts,
+    detect_panel_state,
+    extract_price_digits,
+    parse_price_cards,
+    price_matches,
 )
 
 pytestmark = pytest.mark.unit
@@ -30,275 +34,236 @@ def _fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
-# ---------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
 # CTA 白名单
-# ---------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("text", sorted(SAFE_TEXTS))
-def test_safe_texts_are_clickable(text: str):
+def test_every_safe_text_is_clickable(text: str):
     assert is_safe_to_click(text) is True
 
 
 @pytest.mark.parametrize("text", sorted(BLOCKED_TEXTS))
-def test_blocked_texts_are_rejected(text: str):
+def test_every_blocked_text_is_rejected(text: str):
+    """预约/预售文案一个都不能放过 —— 点了就进完全不同的流程。"""
     assert is_safe_to_click(text) is False
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        None,
-        "",
-        "   ",
-        "  立即购票  ",  # 带空格 → 不算精确相等，必须拒绝
-        "立即购票进行中",
-        "未知文案",
-        "立即购票\n",
-    ],
-)
-def test_unknown_or_padded_texts_rejected(text: str | None):
-    """锁定「精确相等」语义：不做包含匹配、不自动 strip。"""
+@pytest.mark.parametrize("text", [None, "", "   ", "立即购买2", "未知按钮", "立即购票吧"])
+def test_unknown_or_empty_text_is_rejected(text):
+    """fail-closed：只有精确等于白名单才放行。"""
     assert is_safe_to_click(text) is False
 
 
-def test_safe_and_blocked_sets_do_not_overlap():
-    assert not SAFE_TEXTS & BLOCKED_TEXTS
-
-
-def test_reservation_text_is_blocked_not_safe():
-    """「预约抢票」是大麦开售前的同一位置按钮，点错就进预约流程。"""
-    assert "预约抢票" in BLOCKED_TEXTS
+def test_blocked_text_containing_safe_word_is_still_rejected():
+    """「预约抢票」里含「抢票」，但语义完全不同，必须拒绝。"""
+    assert "抢票" in "预约抢票"
     assert is_safe_to_click("预约抢票") is False
 
 
-# ---------------------------------------------------------------------- #
-# Activity → 状态
-# ---------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 页面状态
+# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     ("activity", "expected"),
     [
-        ("cn.damai/.project.detail.ProjectDetailActivity", PageState.DETAIL_PAGE.value),
-        ("cn.damai/.trade.NcovSkuActivity", PageState.SKU_PAGE.value),
-        ("cn.damai/.homepage.MainActivity", PageState.HOMEPAGE.value),
-        ("cn.damai/.search.SearchActivity", PageState.SEARCH_PAGE.value),
+        ("cn.damai/.project.detail.ProjectDetailActivity", PageState.DETAIL_PAGE),
+        ("cn.damai/.trade.NcovSkuActivity", PageState.SKU_PAGE),
+        ("cn.damai/.launcher.splash.SplashMainActivity", PageState.HOMEPAGE),
+        ("cn.damai/.search.SearchActivity", PageState.SEARCH_PAGE),
     ],
 )
-def test_state_from_activity(activity: str, expected: str):
-    assert state_from_activity(activity) == expected
+def test_state_from_activity(activity: str, expected: PageState):
+    assert state_from_activity(activity) == expected.value
 
 
-def test_state_from_activity_splash_counts_as_homepage():
-    """SplashMainActivity 含 MainActivity 子串 → 会被认成首页。
+def test_search_activity_is_not_swallowed_by_main_activity():
+    """映射表顺序有讲究：具体页必须排在兜底的 MainActivity 之前。
 
-    这是刻意的：启动闪屏阶段不该去点任何东西，交给上层 wait_for_home_ready
-    去等真实内容加载完。
+    搜索页也是从 MainActivity 起的子页面，顺序错了会被误判成首页，
+    于是一整轮导航都会走错分支。
     """
-    assert state_from_activity("cn.damai/.launcher.splash.SplashMainActivity") == (
-        PageState.HOMEPAGE.value
-    )
+    assert state_from_activity("cn.damai/.search.SearchActivity") == PageState.SEARCH_PAGE.value
 
 
-@pytest.mark.parametrize("activity", ["", "com.android.settings/.Settings", "cn.damai/.webview.WebActivity"])
-def test_state_from_activity_unknown(activity: str):
+@pytest.mark.parametrize("activity", [None, "", "com.other/.Foo"])
+def test_state_from_activity_unknown(activity):
     assert state_from_activity(activity) is None
 
 
-def test_page_state_str_comparison():
-    assert PageState.SKU_PAGE == "sku_page"
-    assert PageState("detail_page") is PageState.DETAIL_PAGE
+# --------------------------------------------------------------------------- #
+# UI 树解析
+# --------------------------------------------------------------------------- #
+def test_parse_bounds():
+    assert ui_tree.parse_bounds("[0,0][1080,2400]") == (0, 0, 1080, 2400)
+    assert ui_tree.parse_bounds("bad") is None
+    assert ui_tree.parse_bounds(None) is None
 
 
-# ---------------------------------------------------------------------- #
-# 售罄识别
-# ---------------------------------------------------------------------- #
-def test_sold_out_detected_from_visible_button_text():
-    """v8.x：btn_buy_view 有文案，直接读文案判断。"""
-    assert is_buy_button_sold_out(_fixture("detail_v8_soldout.xml")) is True
+def test_node_center_rejects_degenerate_bounds():
+    """宽或高为 0 的元素点不到，取中心必须返回 None 而不是同一个点。"""
+    root = ui_tree.parse_xml('<hierarchy><node bounds="[10,10][10,20]" /></hierarchy>')
+    node = ui_tree.iter_nodes(root)[0]
+    assert ui_tree.node_center(node) is None
 
 
-def test_canvas_cta_is_not_reported_sold_out():
-    """≥9.0.2x：Canvas 自绘按钮读不到文案 → 判不了，不能误报售罄。"""
-    assert is_buy_button_sold_out(_fixture("detail_canvas_empty.xml")) is False
+def test_parse_xml_tolerates_truncated_dump():
+    """页面正在动画时 dump 会被截断，此时返回 None 让上层重试而不是抛异常。"""
+    assert ui_tree.parse_xml("<hierarchy><node") is None
 
 
-def test_empty_ancestor_container_does_not_short_circuit():
-    """回归检查：购买栏容器是 btn_buy_view 的**祖先**且出现在文档序前面。
+def test_descendant_texts_dedupes():
+    """同一段文案常在外层容器和内层 TextView 上各出现一次。"""
+    root = ui_tree.parse_xml(
+        '<hierarchy><node text="立即购买"><node text="立即购买"/>'
+        '<node text="¥318"/></node></hierarchy>'
+    )
+    node = ui_tree.iter_nodes(root)[0]
+    assert ui_tree.descendant_texts(node) == ["立即购买", "¥318"]
 
-    若实现「首个命中容器就返回」，v8.x 带文案的按钮会被空文案容器短路，
-    漏检缺货 —— 这正是 detail_v8_soldout.xml 的结构。
+
+def test_clickable_ancestor_finds_container():
+    """日期的 tv_date 自身不可点，真正接点击的是祖先容器。"""
+    root = ui_tree.parse_xml(
+        '<hierarchy><node clickable="true"><node><node resource-id="cn.damai:id/tv_date" '
+        'text="12.26 周六"/></node></node></hierarchy>'
+    )
+    parents = ui_tree.build_parent_map(root)
+    date_node = ui_tree.find_by_resource_id(root, "cn.damai:id/tv_date")[0]
+    ancestor = ui_tree.clickable_ancestor(parents, date_node)
+    assert ancestor is not None
+    assert ui_tree.is_clickable(ancestor)
+
+
+def test_clickable_ancestor_returns_none_when_no_clickable_parent():
+    """祖先链上没有可点节点时返回 None。
+
+    调用方必须显式判 None：ElementTree 的空元素布尔值为 False，
+    用 ``or date_node`` 会在这种合法情形下静默取错 bounds。
     """
-    xml = _fixture("detail_v8_soldout.xml")
-    # 先剥注释再取位置：fixture 顶部的说明文字里也提到了容器 ID，
-    # 直接 xml.index() 会先命中注释，断言就变成"注释在按钮之前"，测不到本意。
-    body = re.sub(r"<!--.*?-->", "", xml, flags=re.S)
-    container_pos = body.index('resource-id="cn.damai:id/trade_project_detail_purchase_status_bar_container_fl"')
-    button_pos = body.index('resource-id="cn.damai:id/btn_buy_view"')
-    assert container_pos < button_pos, "fixture 必须让容器出现在按钮之前，否则测不到这个 bug"
-    assert is_buy_button_sold_out(xml) is True
-
-
-def test_no_relevant_nodes_means_not_sold_out():
-    xml = '<hierarchy><node resource-id="cn.damai:id/title_tv" text="许嵩演唱会" /></hierarchy>'
-    assert is_buy_button_sold_out(xml) is False
-
-
-@pytest.mark.parametrize("xml", [None, "", "   ", "<not-xml", "<a><b></a>"])
-def test_broken_xml_never_raises(xml: str | None):
-    assert is_buy_button_sold_out(xml) is False
-
-
-def test_other_tier_sold_out_text_does_not_count():
-    """别的票档写「缺货登记」不代表当前按钮不可点 —— 只看按钮节点。"""
-    xml = (
-        '<hierarchy><node class="android.widget.TextView" resource-id="cn.damai:id/tv_price_name"'
-        ' text="看台618 缺货登记" bounds="[0,0][100,100]" /></hierarchy>'
+    root = ui_tree.parse_xml(
+        '<hierarchy><node><node><node resource-id="cn.damai:id/tv_date" text="12.26"/></node></node></hierarchy>'
     )
-    assert is_buy_button_sold_out(xml) is False
+    parents = ui_tree.build_parent_map(root)
+    date_node = ui_tree.find_by_resource_id(root, "cn.damai:id/tv_date")[0]
+    assert ui_tree.clickable_ancestor(parents, date_node) is None
 
 
-# ---------------------------------------------------------------------- #
-# 票档面板状态
-# ---------------------------------------------------------------------- #
-class _FakeSelector:
-    def __init__(self, exists: bool) -> None:
-        self.exists = exists
+# --------------------------------------------------------------------------- #
+# 详情页购买栏
+# --------------------------------------------------------------------------- #
+def test_v8_buy_button_text_is_readable():
+    """v8.x 的 btn_buy_view 带文案，读出来才知道能不能点。"""
+    root = ui_tree.parse_xml(_fixture("detail_v8_soldout.xml"))
+    nodes = ui_tree.find_by_resource_id(root, "cn.damai:id/btn_buy_view")
+    assert nodes
+    assert ui_tree.descendant_texts(nodes[0]) == ["缺货登记"]
+    assert is_safe_to_click("缺货登记") is False
 
 
-def _fake_device(present: set[str]) -> object:
-    """构造只认 resourceId / text / textContains 关键字的桩设备。"""
+def test_canvas_buy_bar_has_no_text():
+    """≥9.0.2x 的 CTA 是 Canvas 自绘，整棵子树读不到文案。
 
-    def device(**kwargs: str) -> _FakeSelector:
-        for key in ("resourceId", "text", "textContains"):
-            value = kwargs.get(key)
-            if value is not None:
-                return _FakeSelector(value in present)
-        return _FakeSelector(False)
-
-    return device
-
-
-def test_price_panel_loading_wins_over_everything():
-    device = _fake_device(
-        {
-            "cn.damai:id/sku_loading",
-            "cn.damai:id/loading_progress",
-            "已售罄",
-            "cn.damai:id/layout_price",
-        }
+    这条是「读不到 ≠ 没开售」的证据：只能靠坐标 + 时间闸门判定，
+    绝不能因为没有文案就认定不能买。
+    """
+    root = ui_tree.parse_xml(_fixture("detail_canvas_empty.xml"))
+    nodes = ui_tree.find_by_resource_id(
+        root, "cn.damai:id/trade_project_detail_purchase_status_bar_container_fl"
     )
-    assert detect_price_panel_state(device) == "loading"
+    assert nodes
+    assert ui_tree.descendant_texts(nodes[0]) == []
 
 
-def test_price_panel_sold_out_before_ready():
-    """面板既显示售罄又有容器时判定为售罄 —— 空卡片不能点。"""
-    device = _fake_device({"已售罄", "cn.damai:id/layout_price"})
-    assert detect_price_panel_state(device) == "sold_out"
+@pytest.mark.parametrize("fixture", ["detail_v8_soldout.xml", "detail_canvas_empty.xml"])
+def test_buy_bar_container_center_is_stable(fixture: str):
+    """容器坐标兜底点击必须落在购买栏内，而不是屏幕别处。"""
+    root = ui_tree.parse_xml(_fixture(fixture))
+    nodes = ui_tree.find_by_resource_id(
+        root, "cn.damai:id/trade_project_detail_purchase_status_bar_container_fl"
+    )
+    assert ui_tree.node_center(nodes[0]) == (540, 2325)
 
 
-def test_price_panel_ready():
-    device = _fake_device({"cn.damai:id/project_detail_perform_price_flowlayout"})
-    assert detect_price_panel_state(device) == "ready"
+# --------------------------------------------------------------------------- #
+# 票档
+# --------------------------------------------------------------------------- #
+def test_price_cards_only_count_clickable_direct_children():
+    """卡片判据是「价格容器的直接子节点 + FrameLayout + clickable」。
+
+    卡 3 的 FrameLayout clickable=false，必须被排除；卡内的 tv_price
+    clickable=false，也不能被算成独立卡片。
+    """
+    root = ui_tree.parse_xml(_fixture("sku_price_cards.xml"))
+    cards = parse_price_cards(root)
+    assert len(cards) == 3
+    assert [card.index for card in cards] == [0, 1, 2]
 
 
-def test_price_panel_unknown():
-    assert detect_price_panel_state(_fake_device(set())) == "unknown"
+def test_price_card_tags_mark_unavailable():
+    """「缺货登记」「预售」都不可点 —— 后者看着能点，点下去进预约流。"""
+    cards = parse_price_cards(ui_tree.parse_xml(_fixture("sku_price_cards.xml")))
+    assert cards[0].tag == ""
+    assert cards[0].available is True
+    assert cards[1].tag == "缺货登记"
+    assert cards[1].available is False
+    assert cards[2].tag == "预售"
+    assert cards[2].available is False
 
 
-def test_price_panel_survives_device_errors():
-    def broken(**_: str) -> _FakeSelector:
-        raise RuntimeError("device gone")
-
-    assert detect_price_panel_state(broken) == "unknown"
-
-
-# ---------------------------------------------------------------------- #
-# PageProbe 缓存与强制状态
-# ---------------------------------------------------------------------- #
-class _CountingDevice:
-    """统计 app_current 调用次数的桩设备。"""
-
-    def __init__(self, activity: str) -> None:
-        self.activity = activity
-        self.calls = 0
-
-    def app_current(self) -> dict[str, str]:
-        self.calls += 1
-        return {"activity": self.activity}
-
-    def __call__(self, **_: str) -> _FakeSelector:
-        return _FakeSelector(False)
+def test_collapse_card_texts_drops_decorative_tags():
+    """价格被拆成 ¥/318/起 三段，「惠」是营销角标要丢掉。"""
+    assert collapse_card_texts(["¥", "318", "起", "惠"]) == "¥318起"
+    assert price_matches(collapse_card_texts(["¥", "318", "起"]), "318")
 
 
-def test_probe_caches_within_ttl():
-    device = _CountingDevice("cn.damai/.homepage.MainActivity")
-    probe = PageProbe(device, cache_ttl_s=10.0)
-    probe.probe(fast=True)
-    probe.probe(fast=True)
-    probe.probe(fast=True)
-    assert device.calls == 1
+def test_collapse_keeps_price_when_only_tag_exists():
+    """只剩角标时拼出来是空串，此时该卡片必须被判为不可用。"""
+    assert collapse_card_texts(["惠", ""]) == ""
 
 
-def test_probe_invalidate_forces_refresh():
-    device = _CountingDevice("cn.damai/.homepage.MainActivity")
-    probe = PageProbe(device, cache_ttl_s=10.0)
-    probe.probe(fast=True)
-    probe.invalidate()
-    probe.probe(fast=True)
-    assert device.calls == 2
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("看台318", 318),
+        ("¥318 起", 318),
+        ("318元", 318),
+        ("￥1,280", 280),  # 千分位只抓到后三位，交给归一化包含比较兜底
+        ("", None),
+        (None, None),
+    ],
+)
+def test_extract_price_digits(text, expected):
+    assert extract_price_digits(text) == expected
 
 
-def test_probe_force_state_skips_device():
-    device = _CountingDevice("cn.damai/.homepage.MainActivity")
-    probe = PageProbe(device, cache_ttl_s=0.0)
-    probe.force_state(PageState.ORDER_CONFIRM_PAGE)
-    assert probe.probe()["state"] == PageState.ORDER_CONFIRM_PAGE.value
-    assert device.calls == 0
-    probe.force_state(None)
-    probe.probe(fast=True)
-    assert device.calls == 1
+@pytest.mark.parametrize(
+    ("card_text", "target", "expected"),
+    [
+        ("¥318起", "318", True),
+        ("看台318", "318", True),
+        ("318元", "看台318", True),
+        ("¥618", "318", False),
+        ("", "318", False),
+    ],
+)
+def test_price_matches(card_text: str, target: str, expected: bool):
+    assert price_matches(card_text, target) is expected
 
 
-def test_probe_current_page_alias_still_works():
-    """移植过来的调用点用的是 probe_current_page，别名不能丢。"""
-    probe = PageProbe(_CountingDevice("cn.damai/.trade.NcovSkuActivity"), cache_ttl_s=0.0)
-    assert probe.probe_current_page(fast=True)["state"] == PageState.SKU_PAGE.value
+def test_panel_state_ready_when_any_card_available():
+    """还有一档能买就不是售罄 —— 早判售罄会白白放弃一轮机会。"""
+    cards_root = ui_tree.parse_xml(_fixture("sku_price_cards.xml"))
+    assert detect_panel_state(cards_root) == "ready"
 
 
-# ---------------------------------------------------------------------- #
-# Guard 元素读取
-# ---------------------------------------------------------------------- #
-class _FakeButton:
-    def __init__(self, text: str, bounds: dict[str, int] | None = None) -> None:
-        self.exists = True
-        self._text = text
-        self.info = {"bounds": bounds} if bounds else {}
-
-    def get_text(self) -> str:
-        return self._text
+def test_panel_state_loading_beats_sold_out():
+    """面板刚弹出时列表为空，必须判成 loading 而不是售罄。"""
+    root = ui_tree.parse_xml(
+        '<hierarchy><node resource-id="cn.damai:id/project_detail_perform_price_flowlayout"/>'
+        '<node text="加载中，请稍候"/></hierarchy>'
+    )
+    assert detect_panel_state(root) == "loading"
 
 
-class _FakeGuardDevice:
-    def __init__(self, button: _FakeButton | None) -> None:
-        self._button = button
-
-    def __call__(self, **_: str) -> _FakeButton:
-        if self._button is None:
-            raise RuntimeError("not found")
-        return self._button
-
-
-def test_guard_reads_cta_text():
-    guard = BuyButtonGuard(_FakeGuardDevice(_FakeButton("立即购票")))
-    assert guard.read_cta_text() == "立即购票"
-    assert guard.is_safe_to_click("立即购票") is True
-
-
-def test_guard_returns_none_when_button_absent():
-    guard = BuyButtonGuard(_FakeGuardDevice(None))
-    assert guard.read_cta_text() is None
-    assert guard.cta_center() is None
-
-
-def test_guard_computes_cta_center():
-    bounds = {"left": 0, "top": 2250, "right": 1080, "bottom": 2400}
-    guard = BuyButtonGuard(_FakeGuardDevice(_FakeButton("", bounds)))
-    assert guard.cta_center() == (540, 2325)
+def test_panel_state_unknown_when_container_missing():
+    assert detect_panel_state(ui_tree.parse_xml("<hierarchy />")) == "unknown"

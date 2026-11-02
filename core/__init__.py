@@ -1,8 +1,13 @@
-"""Appium 控制 Android 设备的轻量封装，对外入口主要是 AndroidDevice 与 session。"""
+"""Android 设备自动化底座。
+
+对外入口是 :class:`core.android.actions.AndroidDevice` 与
+:func:`core.android.u2_driver.connect`：前者是设备能力门面（与驱动无关），
+后者是 uiautomator2 后端的具体实现。
+"""
+
+from __future__ import annotations
 
 from core.android.actions import AndroidDevice, Screen, to_by
-from core.appiums.driver_factory import create_driver, ensure_server, resolve_udid, session, AppiumServerError, \
-    DeviceNotFoundError
 from core.config.config import DeviceConfig
 from core.logger import get_logger, setup_logging
 
@@ -13,12 +18,6 @@ __all__ = [
     "Screen",
     "to_by",
     "DeviceConfig",
-    "create_driver",
-    "ensure_server",
-    "resolve_udid",
-    "session",
-    "AppiumServerError",
-    "DeviceNotFoundError",
     "get_logger",
     "setup_logging",
     "__version__",

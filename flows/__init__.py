@@ -1,12 +1,12 @@
 """业务流层：跨页面的端到端编排。
 
-- ``flows/taobao_flow.py`` —— 淘宝主流程（启动 → 搜索 → 详情 → 加购 → 购物车校验）
+``flows/damai_flow.py`` —— 大麦抢票（搜索 → 详情 → 等开售 → 票档 → 观演人 → 提交）。
 
-用例只依赖本层，不直接碰页面细节。
+用例与脚本只依赖本层，不直接碰页面细节。
 """
 
 from __future__ import annotations
 
-from flows.taobao_flow import CartFlowResult, FlowError, ProductSnapshot, TaobaoFlow
+from flows.damai_flow import DamaiFlow, FlowError
 
-__all__ = ["TaobaoFlow", "FlowError", "ProductSnapshot", "CartFlowResult"]
+__all__ = ["DamaiFlow", "FlowError"]

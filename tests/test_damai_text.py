@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import pytest
 
-from damai.date_utils import normalize_date
-from damai.text_utils import (
+from core.text import (
     KNOWN_CITY_TOKENS,
     city_keyword,
     find_conflicting_city,
+    normalize_date,
     normalize_text,
     title_similarity,
 )

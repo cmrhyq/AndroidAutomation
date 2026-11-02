@@ -1,4 +1,4 @@
-"""报告基建的离线用例：不碰设备、不建 Appium 会话，秒级回归。
+"""报告基建的离线用例：不碰设备、不建设备会话，秒级回归。
 
 覆盖 environment.properties 编码、categories.json 结构与 collector 的 no-op 语义。"""
 
@@ -51,7 +51,7 @@ def test_write_properties_follows_field_order(tmp_path: Path):
     """环境表按固定字段顺序展示，别被 dict 插入顺序打乱。"""
     path = write_properties(
         tmp_path / "environment.properties",
-        {"Host": "pc", "App.Package": "com.taobao.taobao", "Device.Model": "PFGM00"},
+        {"Host": "pc", "App.Package": "cn.damai", "Device.Model": "PFGM00"},
     )
     lines = [line.split("=")[0] for line in path.read_text(encoding="utf-8").splitlines() if line]
 

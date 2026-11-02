@@ -66,25 +66,19 @@ def get_int(key: str, default: int = 0) -> int:
 
 @dataclass
 class DeviceConfig:
-    """一次 Appium 会话所需的全部参数。"""
+    """设备连接参数（与具体驱动无关）。
 
-    server_url: str = field(default_factory=lambda: get("APPIUM_SERVER_URL", "http://127.0.0.1:4723"))
+    只保留真正要配的东西：连哪台设备、启动哪个应用。``server_url`` /
+    ``no_reset`` / ``system_port`` 这类中间服务参数随旧驱动栈一并删掉了 ——
+    uiautomator2 是直连设备，没有中间服务可配。
+    """
+
     udid: str = field(default_factory=lambda: get("DEVICE_UDID"))
-    device_name: str = field(default_factory=lambda: get("DEVICE_NAME", "Android"))
-    platform_version: str = field(default_factory=lambda: get("PLATFORM_VERSION"))
     app_package: str = field(default_factory=lambda: get("APP_PACKAGE"))
     app_activity: str = field(default_factory=lambda: get("APP_ACTIVITY"))
-    no_reset: bool = field(default_factory=lambda: get_bool("NO_RESET", True))
-    auto_grant_permissions: bool = field(default_factory=lambda: get_bool("AUTO_GRANT_PERMISSIONS", True))
-    new_command_timeout: int = field(default_factory=lambda: get_int("NEW_COMMAND_TIMEOUT", 120))
-    implicit_wait: int = field(default_factory=lambda: get_int("IMPLICIT_WAIT", 0))
-    auto_start_appium: bool = field(default_factory=lambda: get_bool("AUTO_START_APPIUM", True))
-    # uiautomator2 server 在设备上的监听端口。默认 8200；多设备并行或 8200 被
-    # 残留进程占用时（表现为大量命令莫名 404），换一个端口即可。
-    system_port: int = field(default_factory=lambda: get_int("SYSTEM_PORT", 0))
 
     @classmethod
-    def load(cls) -> "DeviceConfig":
+    def load(cls) -> DeviceConfig:
         return cls()
 
     def ensure_dirs(self) -> None:
@@ -92,7 +86,4 @@ class DeviceConfig:
             d.mkdir(parents=True, exist_ok=True)
 
     def summary(self) -> str:
-        return (
-            f"server={self.server_url} udid={self.udid or '<auto>'} "
-            f"app={self.app_package or '<none>'} no_reset={self.no_reset}"
-        )
+        return f"udid={self.udid or '<auto>'} app={self.app_package or '<none>'}"

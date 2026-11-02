@@ -1,15 +1,12 @@
 """环境信息采集：产出 Allure 的 environment.properties。
 
-运行期从 driver capabilities 取（最准），缺项用 adb + Appium /status 兜底。
+运行期从设备后端取（最准），缺项用 adb 兜底。
 非 ASCII 值需转成 Unicode 转义 —— Allure 按 Java Properties 解析，中文直写会乱码。"""
 
 from __future__ import annotations
 
-import json
 import platform
 import socket
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +22,6 @@ _FIELDS = (
     "Screen.Size",
     "App.Package",
     "App.Version",
-    "Appium.Server",
-    "Appium.Version",
     "Python.Version",
     "Pytest.Version",
     "Host",
@@ -73,7 +68,6 @@ def _runtime_env(dev: Any) -> dict[str, str]:
         "Device.Model": str(caps.get("deviceModel") or caps.get("deviceName") or ""),
         "Device.UDID": str(caps.get("udid") or getattr(cfg, "udid", "") or ""),
         "Android.Version": str(caps.get("platformVersion") or ""),
-        "Appium.Server": str(getattr(cfg, "server_url", "") or ""),
     }
 
     package = str(getattr(cfg, "app_package", "") or "")
@@ -96,7 +90,7 @@ def _runtime_env(dev: Any) -> dict[str, str]:
 
 
 def _static_env() -> dict[str, str]:
-    """不依赖 Appium 会话的采集：adb + ``/status``。"""
+    """不依赖设备会话的采集：配置 + adb。"""
     from core.config.config import DeviceConfig
 
     info: dict[str, str] = {}
@@ -104,7 +98,6 @@ def _static_env() -> dict[str, str]:
     try:
         cfg = DeviceConfig.load()
         info["App.Package"] = cfg.app_package or ""
-        info["Appium.Server"] = cfg.server_url or ""
         serial = cfg.udid or ""
     except Exception:  # noqa: BLE001 - 配置读不到就退回自动探测
         pass
@@ -118,7 +111,6 @@ def _static_env() -> dict[str, str]:
         if info.get("App.Package"):
             info["App.Version"] = _app_version(serial, info["App.Package"])
 
-    info["Appium.Version"] = _appium_server_version(info.get("Appium.Server", ""))
     return {k: v for k, v in info.items() if v}
 
 
@@ -149,7 +141,7 @@ def _escape(value: str) -> str:
 
 
 # ---------------------------------------------------------------------- #
-# adb / appium 底层探测
+# adb 底层探测
 # ---------------------------------------------------------------------- #
 def _run(cmd: list[str], timeout: int = 12) -> str:
     from core.android.proc import run_cmd
@@ -161,7 +153,7 @@ def _run(cmd: list[str], timeout: int = 12) -> str:
 
 
 def _adb_bin() -> str:
-    from core.android.env_check import find_adb
+    from core.android.adb import find_adb
 
     try:
         return find_adb()
@@ -188,17 +180,3 @@ def _app_version(serial: str, package: str) -> str:
         if "versionName=" in line:
             return line.split("versionName=", 1)[1].split()[0]
     return ""
-
-
-def _appium_server_version(server_url: str) -> str:
-    """问 Appium 的 ``/status`` 拿服务端版本（客户端库版本 ≠ 服务端版本）。"""
-    if not server_url:
-        return ""
-    try:
-        url = server_url.rstrip("/") + "/status"
-        with urllib.request.urlopen(url, timeout=3) as resp:  # noqa: S310 - 地址来自本地配置
-            payload = json.loads(resp.read().decode("utf-8", "replace"))
-    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
-        return ""
-    build = (payload.get("value") or {}).get("build") or {}
-    return str(build.get("version") or "")
