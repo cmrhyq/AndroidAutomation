@@ -423,6 +423,16 @@ class GrabConfig:
     def if_commit_order(self) -> bool:
         return self.mode is GrabMode.SUBMIT
 
+    @property
+    def rush_mode(self) -> bool:
+        """是否处于「会真的点购票入口」的抢票状态。
+
+        对应的正是源项目那个独立配置项 ``rush_mode``，但这里不再单独可配：
+        既然 PROBE 模式承诺不点购票，那所有「省掉复核、按缓存坐标直点」的
+        极速路径就都该跟着模式走，而不是让用户再开一个开关去和模式对赌。
+        """
+        return self.mode.clicks_purchase
+
     # -- 序列化 --
     def to_dict(self) -> dict[str, object]:
         """稳定序列化（不含 serial，避免机器差异污染指纹）。"""

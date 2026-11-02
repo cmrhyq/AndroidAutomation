@@ -221,3 +221,6 @@ artifacts/
 # 大麦抢票：真实配置含观演人姓名，不入库（模板见 damai/config.example.jsonc）
 damai/config.jsonc
 damai/config.local.jsonc
+
+# 抢票链路的临时 UI dump（page_helpers 默认落这里）
+tmp/

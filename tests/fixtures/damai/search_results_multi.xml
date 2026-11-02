@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<!--
+  结构摘录：大麦搜索「许嵩 演唱会」后的结果列表。
+  三张卡片刻意构造成三个打分陷阱，用于验证搜索卡评分不会误点：
+    卡1 title 含「福州」但城市字段写「厦门」→ 城市冲突必须否决
+    卡2 「周杰伦」同名年份不同（2024）→ 年份冲突扣分
+    卡3 正确目标：福州站、场馆一致
+  ll_search_item 的 clickable 由内部节点承担，卡片本身不可点。
+-->
+<hierarchy rotation="0">
+  <node index="0" class="android.widget.FrameLayout" resource-id="" bounds="[0,0][1080,2400]">
+    <node index="0" class="android.widget.LinearLayout" resource-id="cn.damai:id/ll_search_item" bounds="[0,300][1080,600]">
+      <node index="0" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_name" text="许嵩「呼吸之野」巡回演唱会-福州站" bounds="[40,320][900,380]" />
+      <node index="1" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_venueName" text="厦门奥林匹克体育中心" bounds="[40,400][900,440]" />
+      <node index="2" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_city" text="厦门" bounds="[40,460][200,500]" />
+      <node index="3" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_time" text="2026.12.26 周六 19:30" bounds="[40,520][700,560]" />
+    </node>
+    <node index="1" class="android.widget.LinearLayout" resource-id="cn.damai:id/ll_search_item" bounds="[0,600][1080,900]">
+      <node index="0" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_name" text="许嵩 2024 演唱会-福州站" bounds="[40,620][900,680]" />
+      <node index="1" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_venueName" text="福州海峡奥体中心" bounds="[40,700][900,740]" />
+      <node index="2" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_city" text="福州" bounds="[40,760][200,800]" />
+      <node index="3" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_time" text="2024.05.01 周三 19:30" bounds="[40,820][700,860]" />
+    </node>
+    <node index="2" class="android.widget.LinearLayout" resource-id="cn.damai:id/ll_search_item" bounds="[0,900][1080,1200]">
+      <node index="0" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_name" text="许嵩「呼吸之野」巡回演唱会-福州站" bounds="[40,920][900,980]" />
+      <node index="1" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_venueName" text="福州海峡奥体中心体育场" bounds="[40,1000][900,1040]" />
+      <node index="2" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_city" text="福州" bounds="[40,1060][200,1100]" />
+      <node index="3" class="android.widget.TextView" resource-id="cn.damai:id/tv_project_time" text="2026.12.26 周六 19:30" bounds="[40,1120][700,1160]" />
+    </node>
+  </node>
+</hierarchy>

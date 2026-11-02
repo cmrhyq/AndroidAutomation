@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<!--
+  结构摘录：大麦 SKU 页票档区，四档卡片覆盖四种状态。
+    卡0 正常可售，价格拆成 ¥ / 318 / 起 三段 + 「惠」角标
+    卡1 已售罄（缺货登记）
+    卡2 预售（能点，但点了进预约流程）
+    卡3 普通可售
+  只有「直接子节点 + FrameLayout + clickable」才算卡片；
+  卡内的 tv_price 等节点 clickable=false，不会被误算成卡片。
+-->
+<hierarchy rotation="0">
+  <node index="0" class="android.widget.FrameLayout" resource-id="" bounds="[0,0][1080,2400]">
+    <node index="0" class="android.view.ViewGroup" resource-id="cn.damai:id/project_detail_perform_price_flowlayout" bounds="[0,1800][1080,2100]">
+      <node index="0" class="android.widget.FrameLayout" clickable="true" resource-id="" bounds="[40,1820][540,1960]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_prefix" text="¥" bounds="[60,1840][90,1880]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_des" text="318" bounds="[90,1840][200,1880]" />
+        <node index="2" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_suffix" text="起" bounds="[200,1840][240,1880]" />
+        <node index="3" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price_tag" text="惠" bounds="[400,1840][460,1880]" />
+      </node>
+      <node index="1" class="android.widget.FrameLayout" clickable="true" resource-id="" bounds="[540,1820][1040,1960]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_des" text="618" bounds="[560,1840][700,1880]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price_tag" text="缺货登记" bounds="[800,1840][1000,1880]" />
+      </node>
+      <node index="2" class="android.widget.FrameLayout" clickable="true" resource-id="" bounds="[40,1960][540,2100]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_des" text="918" bounds="[60,1980][200,2020]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price_tag" text="预售" bounds="[400,1980][500,2020]" />
+      </node>
+      <node index="3" class="android.widget.FrameLayout" clickable="false" resource-id="" bounds="[540,1960][1040,2100]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/bricks_dm_common_price_des" text="1218" bounds="[560,1980][700,2020]" />
+      </node>
+    </node>
+    <node index="1" class="android.view.ViewGroup" resource-id="cn.damai:id/trade_project_detail_purchase_status_bar_container_fl" bounds="[0,2250][1080,2400]">
+      <node index="0" class="android.widget.Button" resource-id="cn.damai:id/btn_buy_view" text="立即购买" bounds="[40,2280][1040,2370]" />
+    </node>
+  </node>
+</hierarchy>

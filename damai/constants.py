@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 
 __all__ = [
+    "ATTENDEE_CHECKBOX_ID",
+    "ATTENDEE_NAME_ID",
     "BLOCKED_TEXTS",
     "BUY_BAR_CONTAINER_ID",
     "BUY_BUTTON_RESOURCE_IDS",
@@ -19,8 +21,18 @@ __all__ = [
     "CTA_READY_KEYWORDS",
     "DAMAI_MAIN_ACTIVITY",
     "DAMAI_PACKAGE",
+    "HOME_READY_RESOURCE_IDS",
     "SAFE_TEXTS",
     "SALE_READY_TEXTS",
+    "SEARCH_INPUT_CLEAR_ID",
+    "SEARCH_INPUT_RESOURCE_IDS",
+    "SEARCH_RESULT_CITY_ID",
+    "SEARCH_RESULT_RESOURCE_ID",
+    "SEARCH_RESULT_TIME_ID",
+    "SEARCH_RESULT_TITLE_ID",
+    "SEARCH_RESULT_VENUE_ID",
+    "SESSION_DATE_RESOURCE_ID",
+    "SESSION_PANEL_RESOURCE_ID",
     "SOLD_OUT_RE",
     "UNAVAILABLE_PRICE_TAGS",
 ]
@@ -115,6 +127,8 @@ BUY_BUTTON_RESOURCE_IDS: tuple[str, ...] = (BUY_BUTTON_ID, BUY_BAR_CONTAINER_ID)
 SOLD_OUT_RE = re.compile(r"缺货|售罄|无票")
 
 #: 票档卡片上出现即视为不可选的标签。
+#: ``可预约`` / ``预售`` / ``已预约`` 也必须在内 —— 它们看着能点，
+#: 但点下去进的是预约流程，不是买票。
 UNAVAILABLE_PRICE_TAGS: frozenset[str] = frozenset(
     {
         "无票",
@@ -124,5 +138,42 @@ UNAVAILABLE_PRICE_TAGS: frozenset[str] = frozenset(
         "已售罄",
         "不可选",
         "暂不可售",
+        "可预约",
+        "预售",
+        "已预约",
     }
 )
+
+
+# ---------------------------------------------------------------------- #
+# 导航：搜索与场次
+# ---------------------------------------------------------------------- #
+#: 首页搜索入口（任一存在即认为首页就绪）。
+HOME_READY_RESOURCE_IDS: tuple[str, ...] = (
+    "cn.damai:id/pioneer_homepage_header_search_btn",
+    "cn.damai:id/homepage_header_search",
+    "cn.damai:id/homepage_header_search_layout",
+)
+
+#: 搜索页输入框。真机 9.0.37 上 ``header_search_v2_input`` 已不存在，
+#: 首页 dump 里能查到的是 ``search_text``；两者都保留按序尝试。
+SEARCH_INPUT_RESOURCE_IDS: tuple[str, ...] = (
+    "cn.damai:id/header_search_v2_input",
+    "cn.damai:id/search_text",
+)
+SEARCH_INPUT_CLEAR_ID = "cn.damai:id/header_search_v2_input_delete"
+
+#: 搜索结果列表与卡片字段
+SEARCH_RESULT_RESOURCE_ID = "cn.damai:id/ll_search_item"
+SEARCH_RESULT_TITLE_ID = "cn.damai:id/tv_project_name"
+SEARCH_RESULT_VENUE_ID = "cn.damai:id/tv_project_venueName"
+SEARCH_RESULT_CITY_ID = "cn.damai:id/tv_project_city"
+SEARCH_RESULT_TIME_ID = "cn.damai:id/tv_project_time"
+
+#: 多场次面板：日期卡片
+SESSION_PANEL_RESOURCE_ID = "cn.damai:id/sku_panel_dates"
+SESSION_DATE_RESOURCE_ID = "cn.damai:id/tv_date"
+
+#: 确认页观演人
+ATTENDEE_CHECKBOX_ID = "cn.damai:id/checkbox"
+ATTENDEE_NAME_ID = "cn.damai:id/text_name"

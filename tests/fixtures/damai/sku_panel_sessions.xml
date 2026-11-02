@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<!--
+  结构摘录：大麦多场次 SKU 面板（sku_panel_dates）。
+  关键结构点：tv_date 节点自身 clickable=false，可点的是它的祖先日期卡。
+  select_session 必须靠「上溯找可点祖先」才能拿到正确的 bounds，
+  直接点 tv_date 会点不动。两条「12.26」是刻意造的歧义场景。
+-->
+<hierarchy rotation="0">
+  <node index="0" class="android.widget.FrameLayout" resource-id="" bounds="[0,0][1080,2400]">
+    <node index="0" class="android.widget.HorizontalScrollView" resource-id="cn.damai:id/sku_panel_dates" bounds="[0,1400][1080,1600]">
+      <node index="0" class="android.view.ViewGroup" clickable="true" resource-id="" bounds="[40,1420][540,1580]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_date" text="12.26 周六 19:30" bounds="[60,1440][520,1520]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price" text="看台318起" bounds="[60,1520][520,1570]" />
+      </node>
+      <node index="1" class="android.view.ViewGroup" clickable="true" resource-id="" bounds="[540,1420][1040,1580]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_date" text="12.26 周六 19:30" bounds="[560,1440][1020,1520]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price" text="看台618起" bounds="[560,1520][1020,1570]" />
+      </node>
+      <node index="2" class="android.view.ViewGroup" clickable="true" resource-id="" bounds="[1040,1420][1500,1580]">
+        <node index="0" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_date" text="12.27 周日 19:30" bounds="[1060,1440][1480,1520]" />
+        <node index="1" class="android.widget.TextView" clickable="false" resource-id="cn.damai:id/tv_price" text="看台318起" bounds="[1060,1520][1480,1570]" />
+      </node>
+    </node>
+  </node>
+</hierarchy>
